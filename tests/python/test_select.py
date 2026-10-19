@@ -226,12 +226,26 @@ class TestTags:
             PYTHON_VERSION, PLATFORM, ["cp313"], *LIBC
         )
 
-    @pytest.mark.parametrize("platform", ["macosx_11_0_arm64", "win_amd64", "any"])
+    @pytest.mark.parametrize("platform", ["win_amd64", "any"])
     def test_a_platform_that_is_not_linux_travels_alone(self, platform: str) -> None:
         # **`manylinux` is a Linux rule**, and this function states the target
         # rather than describe the machine that runs it. A platform with no
         # such rule needs no expansion.
         assert target_platforms(platform) == [platform]
+
+    def test_a_macos_target_takes_every_release_down_from_its_deployment_target(self) -> None:
+        # `macosx_aarch64` matched no wheel, so every darwin target built
+        # every source distribution.
+        platforms = target_platforms("macosx_arm64", macos_version="14.0")
+        assert platforms[0] == "macosx_14_0_arm64"
+        assert "macosx_11_0_arm64" in platforms
+        assert "macosx_11_0_universal2" in platforms
+        assert "macosx_15_0_arm64" not in platforms
+        assert not any(platform.endswith("x86_64") for platform in platforms)
+
+    def test_a_macos_target_without_a_deployment_target_is_refused(self) -> None:
+        with pytest.raises(RuntimeError, match="deployment target"):
+            target_platforms("macosx_arm64")
 
 
 class TestChoose:
@@ -359,6 +373,19 @@ class TestTheTargetComesFromTheNixHalf:
         monkeypatch.setenv("PYDD_TARGET", json.dumps({**TARGET_DOCUMENT, "markers": markers}))
         with pytest.raises(RuntimeError, match="sys_platform"):
             target_from_environ()
+
+    def test_a_macos_document_takes_a_macos_wheel(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        document = {
+            **TARGET_DOCUMENT,
+            "platform": "macosx_arm64",
+            "libc": "libSystem",
+            "libcVersion": "",
+            "macosVersion": "14.0",
+        }
+        monkeypatch.setenv("PYDD_TARGET", json.dumps(document))
+        tags = target_from_environ().tags
+        assert wheel_rank(wheel("demo", "1.0", "cp313-cp313-macosx_11_0_arm64"), tags) is not None
+        assert wheel_rank(wheel("demo", "1.0", "cp313-cp313-manylinux_2_28_x86_64"), tags) is None
 
     def test_a_document_without_abis_is_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
         document = {key: value for key, value in TARGET_DOCUMENT.items() if key != "abis"}

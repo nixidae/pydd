@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any
 
 from packaging.markers import Marker
 from packaging.requirements import Requirement
-from packaging.tags import Tag, compatible_tags, cpython_tags
+from packaging.tags import Tag, compatible_tags, cpython_tags, mac_platforms
 from packaging.utils import canonicalize_name, parse_wheel_filename
 
 from ._env import env
@@ -193,7 +193,7 @@ class Target:
         return Marker(marker).evaluate(self.markers)
 
 
-def target_platforms(platform: str, libc: str = "", libc_version: str = "") -> list[str]:
+def target_platforms(platform: str, libc: str = "", libc_version: str = "", macos_version: str = "") -> list[str]:
     """Every platform tag that a wheel may carry for this target, best first.
 
     **`packaging.tags.platform_tags` reads the libc of the machine that calls
@@ -204,7 +204,18 @@ def target_platforms(platform: str, libc: str = "", libc_version: str = "") -> l
       2.Y, so each Y from the target's minor down to 17 fits, newest first.
     - PEP 656: the same rule for `musllinux_1_Y` and musl 1.Y. A manylinux
       wheel does not run on musl, and a musllinux one does not run on glibc.
+    - macOS: a `macosx_X_Y_<arch>` wheel runs on X.Y and later, so each
+      release from the target's deployment target down fits. `mac_platforms`
+      takes that version and the arch as arguments, and adds `universal2`.
     """
+    if platform.startswith("macosx_"):
+        if not macos_version:
+            raise RuntimeError(
+                f"the target '{platform}' gives no macOS deployment target. A wheel's tag names the "
+                "oldest macOS that it runs on, and without the target's own no wheel is known to fit."
+            )
+        major, minor = (int(part) for part in [*macos_version.split("."), "0"][:2])
+        return list(mac_platforms((major, minor), platform.removeprefix("macosx_")))
     if not platform.startswith("linux_"):
         return [platform]
     arch = platform.removeprefix("linux_")
@@ -225,7 +236,12 @@ def target_platforms(platform: str, libc: str = "", libc_version: str = "") -> l
 
 
 def target_tags(
-    python_version: str, platform: str, abis: Sequence[str] = (), libc: str = "", libc_version: str = ""
+    python_version: str,
+    platform: str,
+    abis: Sequence[str] = (),
+    libc: str = "",
+    libc_version: str = "",
+    macos_version: str = "",
 ) -> list[Tag]:
     """The tags this environment accepts, in the order that pip prefers them.
 
@@ -249,7 +265,7 @@ def target_tags(
     means the plain build, `cpXY`, and never the planner's own.
     """
     major, minor = (int(part) for part in python_version.split("."))
-    platforms = target_platforms(platform, libc, libc_version)
+    platforms = target_platforms(platform, libc, libc_version, macos_version)
     return [
         *cpython_tags(python_version=(major, minor), abis=list(abis) or [f"cp{major}{minor}"], platforms=platforms),
         *compatible_tags(python_version=(major, minor), interpreter=f"cp{major}{minor}", platforms=platforms),
@@ -374,7 +390,12 @@ def target_from_environ() -> Target:
     return Target(
         tags=tuple(
             target_tags(
-                python_version, platform, document["abis"], document.get("libc", ""), document.get("libcVersion", "")
+                python_version,
+                platform,
+                document["abis"],
+                document.get("libc", ""),
+                document.get("libcVersion", ""),
+                document.get("macosVersion", ""),
             )
         ),
         # `extra` is not a field of the environment. It is the name that a

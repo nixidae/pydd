@@ -601,8 +601,14 @@ let
       # `packaging`, which adds them when the ABI allows.
       abis = builtins.filter (tag: tag != "abi3" && tag != "none") python.pythonABITags;
       # The platform of a wheel tag, which PEP 425 spells differently from
-      # `platform_machine`.
-      platform = "${if hostPlatform.isDarwin then "macosx" else "linux"}_${hostPlatform.parsed.cpu.name}";
+      # `platform_machine`: Apple names aarch64 `arm64`.
+      platform =
+        if hostPlatform.isDarwin then
+          "macosx_${hostPlatform.darwinArch}"
+        else
+          "linux_${hostPlatform.parsed.cpu.name}";
+      # The oldest macOS that the target's binaries run on.
+      macosVersion = if hostPlatform.isDarwin then hostPlatform.darwinMinVersion else "";
       # The newest manylinux or musllinux tag that runs here.
       libc = hostPlatform.libc;
       libcVersion = if hostPlatform.isLinux then pkgs.stdenv.cc.libc.version else "";
