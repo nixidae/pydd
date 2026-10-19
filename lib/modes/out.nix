@@ -100,7 +100,7 @@ let
     node:
     import ../python/graph.nix {
       inherit (pkgs.stdenv.hostPlatform) system;
-      pythonVersion = pkgs.lib.versions.majorMinor python.version;
+      inherit (python) pythonVersion;
       tools = hostTools;
       inherit scripts;
       nodes = [

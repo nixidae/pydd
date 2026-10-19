@@ -33,7 +33,7 @@ time on another machine. Each one has an issue.
 | PEP 600 `manylinux_2_Y` | covered, nixidae/nixidae#843 | `planner.nix` passes the target's libc and its version in `PYDD_TARGET`; `target_platforms` runs from that glibc down to 2.17. `projects/platform-probe` |
 | PEP 656 `musllinux` | covered, nixidae/nixidae#846 | the same, for musl: `musllinux_1_Y` and no manylinux. An unknown libc is refused. Unit tests only: no musl interpreter is cached |
 | macOS platform tags | covered, nixidae/nixidae#844 | `planner.nix` passes `macosx_<darwinArch>` and `darwinMinVersion` in `PYDD_TARGET`; `target_platforms` gives both to `mac_platforms`. Unit tests only: no darwin builder runs the projects |
-| PyPy and other implementations | **wrong**, nixidae/nixidae#845 | the markers say `PyPy`, but the tags are CPython's, so a CPython wheel is accepted |
+| PyPy tags and versions | covered, nixidae/nixidae#845 | `target_tags` takes `generic_tags` with `ppXY` and the target's `pypyXY_ppNN` ABI. The language version is `pythonVersion`, and `python_full_version` is `3.Y.99`, which `markers` overrides. Another implementation is refused |
 
 ## Building: PEP 517, 518 and 660
 

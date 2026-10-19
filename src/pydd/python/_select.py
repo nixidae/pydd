@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Any
 
 from packaging.markers import Marker
 from packaging.requirements import Requirement
-from packaging.tags import Tag, compatible_tags, cpython_tags, mac_platforms
+from packaging.tags import Tag, compatible_tags, cpython_tags, generic_tags, mac_platforms
 from packaging.utils import canonicalize_name, parse_wheel_filename
 
 from ._env import env
@@ -242,6 +242,7 @@ def target_tags(
     libc: str = "",
     libc_version: str = "",
     macos_version: str = "",
+    implementation: str = "cpython",
 ) -> list[Tag]:
     """The tags this environment accepts, in the order that pip prefers them.
 
@@ -263,12 +264,29 @@ def target_tags(
     `cp313` wheels in place of `cp313t` ones. With `cp313t` given, `packaging`
     also drops `abi3`, which a free-threaded build cannot load. No `abis`
     means the plain build, `cpXY`, and never the planner's own.
+
+    **PyPy takes `generic_tags`**, as `sys_tags` does, with the interpreter
+    `ppXY` and an ABI such as `pypy311_pp73`. That ABI names the PyPy release,
+    which only the target knows, so a PyPy target without `abis` is refused.
     """
     major, minor = (int(part) for part in python_version.split("."))
     platforms = target_platforms(platform, libc, libc_version, macos_version)
+    if implementation == "cpython":
+        interpreter = f"cp{major}{minor}"
+        specific = cpython_tags(python_version=(major, minor), abis=list(abis) or [interpreter], platforms=platforms)
+    elif implementation == "pypy":
+        if not abis:
+            raise RuntimeError(
+                "a PyPy target gives no `abis`. Its ABI, as `pypy311_pp73`, names the PyPy release, "
+                "and `packaging` would read it from the interpreter that runs this planner."
+            )
+        interpreter = f"pp{major}{minor}"
+        specific = generic_tags(interpreter=interpreter, abis=list(abis), platforms=platforms)
+    else:
+        raise RuntimeError(f"pydd knows the tags of CPython and PyPy, and the target is '{implementation}'.")
     return [
-        *cpython_tags(python_version=(major, minor), abis=list(abis) or [f"cp{major}{minor}"], platforms=platforms),
-        *compatible_tags(python_version=(major, minor), interpreter=f"cp{major}{minor}", platforms=platforms),
+        *specific,
+        *compatible_tags(python_version=(major, minor), interpreter=interpreter, platforms=platforms),
     ]
 
 
@@ -396,6 +414,7 @@ def target_from_environ() -> Target:
                 document.get("libc", ""),
                 document.get("libcVersion", ""),
                 document.get("macosVersion", ""),
+                markers["implementation_name"],
             )
         ),
         # `extra` is not a field of the environment. It is the name that a

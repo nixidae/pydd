@@ -582,6 +582,8 @@ let
   #: marker of either key overrides `markers`.
   targetMarkers = {
     implementation_name = python.implementation;
+    # PyPy's `version` is its own release, as `7.3.20`, which is what
+    # `sys.implementation.version` says too.
     implementation_version = python.version;
     os_name = "posix";
     platform_machine = hostPlatform.parsed.cpu.name;
@@ -589,14 +591,17 @@ let
     platform_release = "";
     platform_system = if hostPlatform.isDarwin then "Darwin" else "Linux";
     platform_version = "";
-    python_full_version = python.version;
-    python_version = pkgs.lib.versions.majorMinor python.version;
+    # nixpkgs knows no patch level of the language that PyPy implements. `.99`
+    # assumes that PyPy tracks the newest bugfix release; `markers` overrides it.
+    python_full_version =
+      if python.implementation == "cpython" then python.version else "${python.pythonVersion}.99";
+    python_version = python.pythonVersion;
     sys_platform = if hostPlatform.isDarwin then "darwin" else "linux";
   };
 
   targetEnv = {
     PYDD_TARGET = builtins.toJSON {
-      pythonVersion = pkgs.lib.versions.majorMinor python.version;
+      pythonVersion = python.pythonVersion;
       # `cp313t` for a free-threaded build. `abi3` and `none` are left to
       # `packaging`, which adds them when the ABI allows.
       abis = builtins.filter (tag: tag != "abi3" && tag != "none") python.pythonABITags;

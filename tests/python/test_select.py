@@ -243,6 +243,21 @@ class TestTags:
         assert "macosx_15_0_arm64" not in platforms
         assert not any(platform.endswith("x86_64") for platform in platforms)
 
+    def test_a_pypy_target_takes_pypy_wheels_and_no_cpython_ones(self) -> None:
+        accepted = set(target_tags("3.11", PLATFORM, ["pypy311_pp73"], *LIBC, implementation="pypy"))
+        assert Tag("pp311", "pypy311_pp73", "manylinux_2_28_x86_64") in accepted
+        assert Tag("py3", "none", "any") in accepted
+        assert Tag("cp311", "cp311", "manylinux_2_28_x86_64") not in accepted
+        assert Tag("cp311", "abi3", "manylinux_2_28_x86_64") not in accepted
+
+    def test_a_pypy_target_without_abis_is_refused(self) -> None:
+        with pytest.raises(RuntimeError, match="PyPy"):
+            target_tags("3.11", PLATFORM, (), *LIBC, implementation="pypy")
+
+    def test_an_unknown_implementation_is_refused(self) -> None:
+        with pytest.raises(RuntimeError, match="graalpy"):
+            target_tags("3.11", PLATFORM, ["graalpy250"], *LIBC, implementation="graalpy")
+
     def test_a_macos_target_without_a_deployment_target_is_refused(self) -> None:
         with pytest.raises(RuntimeError, match="deployment target"):
             target_platforms("macosx_arm64")
