@@ -7,6 +7,7 @@ own mode and no other.
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from typing import TYPE_CHECKING, Any
@@ -57,9 +58,20 @@ def submit(writer: Writer, document: dict[str, Any]) -> None:
 def root(plan: Plan, inputs: dict[str, Any], name: str, application: str | Sequence[str] | None) -> str:
     """The node that the planner of an environment submits.
 
-    On released Nix (`PYDD_PROTOCOL=out`) `pydd.modes.out` decides it, and
-    puts in the nodes that other planners write.
+    A local project is the root of a planner of its own (`PYDD_PLANNED`), so
+    its node here becomes a node of kind `planned`. `PYDD_ONLY` names the one
+    local node that this planner writes itself, when it is such a planner. On
+    released Nix (`PYDD_PROTOCOL=out`) `pydd.modes.out` decides the rest.
     """
+    planned: dict[str, dict[str, str]] = json.loads(os.environ.get("PYDD_PLANNED") or "{}")
+    only = os.environ.get("PYDD_ONLY")
+    for key, node in plan.local_nodes.items():
+        if key in planned and key != only:
+            plan.replace(node, plan.planned_entry(node, planned[key]))
+    if only is not None:
+        if only not in plan.local_nodes:
+            raise RuntimeError(f"PYDD_ONLY is {only!r}, and the plan has no local project of that key")
+        return plan.local_nodes[only]
     if os.environ.get("PYDD_PROTOCOL") == "out":
         from .out import root as out_root
 

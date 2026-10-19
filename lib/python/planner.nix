@@ -465,8 +465,8 @@ let
   };
 
   # **A mode adds to the inputs what it needs.** `../modes/out.nix` gives each
-  # planner the nodes that the host made, and the planner of the environment
-  # the planners of its local projects. A mode on `builder-rpc-v0` adds nothing.
+  # planner the nodes that the host made, and an application the planner of
+  # its environment. A mode on `builder-rpc-v0` adds nothing.
   mode =
     if protocol == "out" then
       import ../modes/out.nix {
@@ -477,13 +477,13 @@ let
           scripts
           entries
           installer
-          editables
-          uvEditables
           mkPythonPlanner
           plannerEnv
           menu
           venvName
           application
+          plannerRow
+          localPlanned
           ;
       }
     else
@@ -768,6 +768,62 @@ let
 
   menu = builtins.elemAt levels sdistPlannerDepth;
 
+  # A planner, as a node of another graph names it: the `.drv` as an input,
+  # and the output path with no dependency, as `row` gives a fetch.
+  plannerRow = planner: {
+    plannerDrv = builtins.unsafeDiscardOutputDependency planner.drvPath;
+    plannerOut = builtins.unsafeDiscardStringContext planner.outPath;
+  };
+
+  # **A local project is the root of a planner of its own.** Its backend is
+  # declared in its tree, so no evaluation knows its node. Each such planner
+  # runs the same selection as the environment and submits only the node of
+  # one project, `PYDD_ONLY`. A project built from its own sdist takes two:
+  # the archive, and the wheel out of it, which names the first.
+  #
+  # A planner of a local project gets no planner of another local project: two
+  # members that need each other would make two planners that need each other.
+  #
+  # `planned` travels apart from the menu, so `PYDD_INPUTS` stays the one
+  # string of the level that `levelJson` serialised.
+  localSuffix = {
+    editable = "editable";
+    wheel = "from-tree";
+    sdist = "sdist";
+    from-sdist = "from-sdist";
+  };
+  localPlanner =
+    project: form: planned:
+    (mkPythonPlanner {
+      # Nix requires a planner to carry the name of what it submits.
+      name = "${project}-${localSuffix.${form}}";
+      main = "_environment";
+      env = plannerEnv // {
+        PYDD_INPUTS = builtins.elemAt levelJson sdistPlannerDepth;
+        PYDD_PLANNED = builtins.toJSON planned;
+        PYDD_VENV_NAME = venvName;
+        PYDD_ONLY = "${project}:${form}";
+      };
+    }).planner;
+  localPlanned = pkgs.lib.concatMapAttrs (
+    project: spec:
+    let
+      form = spec.mode or "editable";
+    in
+    if form == "sdist" then
+      let
+        archive = {
+          "${project}:sdist" = plannerRow (localPlanner project "sdist" { });
+        };
+      in
+      archive
+      // {
+        "${project}:from-sdist" = plannerRow (localPlanner project "from-sdist" archive);
+      }
+    else
+      { "${project}:${form}" = plannerRow (localPlanner project form { }); }
+  ) (editables // uvEditables);
+
   inputs = menu // mode.inputs;
 in
 mkPythonPlanner {
@@ -784,6 +840,7 @@ mkPythonPlanner {
       # source of this derivation. That is what makes them present in the
       # sandbox.
       PYDD_INPUTS = builtins.toJSON inputs;
+      PYDD_PLANNED = builtins.toJSON localPlanned;
 
       PYDD_VENV_NAME = venvName;
     }
