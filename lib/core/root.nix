@@ -39,6 +39,9 @@
   # because the name of a program is the better name for a result.
   name,
   passthru ? { },
+  # Shell run after the links are made, before `program` is checked: a result
+  # can add the program itself, as `python/script.nix` does.
+  postInstall ? "",
 }:
 
 pkgs.stdenvNoCC.mkDerivation {
@@ -60,16 +63,17 @@ pkgs.stdenvNoCC.mkDerivation {
   dontPruneLibtoolFiles = true;
   installPhase = ''
     runHook preInstall
+    cp -rs --no-preserve=mode "$application" "$out"
+    ${postInstall}
     ${pkgs.lib.optionalString (program != null) ''
-      if [ ! -x "$application/bin/${program}" ]; then
+      if [ ! -x "$out/bin/${program}" ]; then
         echo "the application holds no program called '${program}'." >&2
         echo "It holds:" >&2
-        ls -1 "$application/bin" >&2
+        ls -1 "$out/bin" >&2
         echo "Name one of those with the 'mainProgram' argument." >&2
         exit 1
       fi
     ''}
-    cp -rs --no-preserve=mode "$application" "$out"
     runHook postInstall
   '';
   meta = pkgs.lib.optionalAttrs (program != null) { mainProgram = program; };

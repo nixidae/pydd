@@ -109,6 +109,9 @@
   # A `pylock.toml` for the planner to read: `{ lock }`. `./pylock.nix` gives
   # a value here.
   pylock ? null,
+  # A PEP 723 script for the planner to read: `{ lock, source }`.
+  # `./script.nix` gives a value here.
+  script ? null,
   # The one member to render as an application, or `null` for the environment.
   #
   # **A virtual environment is not a program.** It carries `bin/python`,
@@ -571,6 +574,10 @@ let
     // pkgs.lib.optionalAttrs (pylock != null) {
       # `{ lock }`, from `./pylock.nix`, as a store path.
       inherit pylock;
+    }
+    // pkgs.lib.optionalAttrs (script != null) {
+      # `{ lock, source }`, from `./script.nix`, as store paths.
+      inherit script;
     };
 
   # What every planner reads about the target it plans for. The planner runs on

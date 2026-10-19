@@ -640,6 +640,21 @@ The two entries differ:
 the build succeeds with no `pkg-config` at all.
 `docs/PACKAGING-FACTS.md` records that measurement.
 
+## `script-app`
+
+A PEP 723 script. `hello.py` declares `rich` in its `# /// script` block, and
+uv pins that in `hello.py.lock`:
+
+```console
+$ cd script-app
+$ nix run --file ../../.. pkgs.uv -- lock --script hello.py
+```
+
+`pydd.python.script` builds the environment and installs the script as
+`bin/hello`, run by the environment's interpreter. The planner compares the
+block's `dependencies` with `[manifest] requirements` of the lock, and refuses
+a lock that the block has outgrown: lock the script again after an edit.
+
 ## The two distributions that a project vendors
 
 `vendored-app/vendor` and `local-index/index` hold four small files, and no

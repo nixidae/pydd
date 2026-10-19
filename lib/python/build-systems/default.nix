@@ -22,28 +22,13 @@ let
       value = true;
     }) own
   );
-  rowOf =
-    package: kind: file:
-    let
-      filename = lib.last (lib.splitString "/" file.url);
-    in
-    {
-      inherit kind filename;
-      package = package.name;
-      inherit (package) version;
-      buildSystems = true;
-      drv = pkgs.fetchurl {
-        inherit (file) url hash;
-        name = filename;
-      };
-    };
-  rowsOf =
-    package:
-    map (rowOf package "wheel") (package.wheels or [ ])
-    ++ map (rowOf package "sdist") (lib.optional (package ? sdist) package.sdist);
-  registry = builtins.filter (package: package.source ? registry) document.package;
 in
 {
   inherit lock;
-  rows = builtins.filter (row: !(owned ? ${row.filename})) (lib.concatMap rowsOf registry);
+  rows = builtins.filter (row: !(owned ? ${row.filename})) (
+    import ../registry-rows.nix {
+      inherit pkgs document;
+      extra.buildSystems = true;
+    }
+  );
 }

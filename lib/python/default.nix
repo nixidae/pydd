@@ -30,4 +30,13 @@
     `planner`, `dynamic`, `closure` and `env` in its `passthru`.
   */
   pylock = pkgs.lib.makeOverridable (args: import ./pylock.nix ({ inherit pkgs pydd; } // args));
+
+  /**
+    A PEP 723 script, with the environment its `# /// script` block declares.
+
+    Takes the arguments of `./script.nix`; `script` is the path of the script,
+    and `<script>.lock`, which `uv lock --script` writes, pins it. Returns the
+    environment with the script as `bin/<name>`, and `meta.mainProgram` set.
+  */
+  script = pkgs.lib.makeOverridable (args: import ./script.nix ({ inherit pkgs pydd; } // args));
 }

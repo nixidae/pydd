@@ -21,6 +21,7 @@ let
   checks = {
     pure-app = check ./check-uv.nix { };
     pylock-pure-app = check ./check-uv.nix { reader = pydd.python.pylock; };
+    script-app = check ./check-script.nix { };
     packaged-app = check ./check-packaged.nix { };
     packaged-sdist = check ./check-sdist.nix { };
     workspace-all = check ./check-workspace.nix {
