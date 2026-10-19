@@ -109,6 +109,20 @@ def test_a_build_script_reads_the_links_of_its_package() -> None:
     assert "CARGO_MANIFEST_LINKS" not in specs["proc-macro2-1.0.107-build-script-run"]["env"]
 
 
+def test_a_library_builds_every_crate_type_it_names() -> None:
+    writer = KeepingWriter()
+    planner = Planner(writer, "x86_64-linux", None)
+    graph = json.loads((FIXTURES / "serde-app.unit-graph.json").read_text())
+    metadata = json.loads((FIXTURES / "serde-app.metadata.json").read_text())
+    for unit in graph["units"]:
+        if unit["target"]["name"] == "serde" and "lib" in unit["target"]["kind"]:
+            unit["target"]["crate_types"] = ["staticlib", "cdylib", "rlib"]
+    planner.submit(Graph(planner, menu(), graph, metadata).root())
+    specs = {drv.name: json.loads(drv.env["PYDD_UNIT"]) for drv in writer.added}
+    flags = specs["serde-1.0.229"]["flags"]
+    assert [flags[i + 1] for i, flag in enumerate(flags) if flag == "--crate-type"] == ["staticlib", "cdylib", "rlib"]
+
+
 def test_a_proc_macro_links_dynamically() -> None:
     _, specs = plan()
     flags = specs["serde_derive-1.0.229"]["flags"]

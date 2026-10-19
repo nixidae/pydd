@@ -319,14 +319,18 @@ class Graph:
         manifest_dir = self.manifest_dir(unit)
         crate_name = target["name"].replace("-", "_")
         build_script = self.is_build_script(index)
-        crate_type = target["crate_types"][0]
+        # A library may name several, as Tauri's `staticlib`, `cdylib` and
+        # `rlib`. rustc writes one artefact for each, and a dependent's
+        # `--extern` reads the rlib.
+        crate_types = target["crate_types"]
+        crate_type = crate_types[0]
         testing = unit["mode"] == "test"
         metadata = self.metadata(index)
         flags = [
             "--crate-name",
             crate_name,
             f"--edition={target['edition']}",
-            *(["--test"] if testing else ["--crate-type", crate_type]),
+            *(["--test"] if testing else [arg for kind in crate_types for arg in ("--crate-type", kind)]),
             *profile_flags(unit),
             *(arg for feature in unit["features"] for arg in ("--cfg", f'feature="{feature}"')),
             "-C",
