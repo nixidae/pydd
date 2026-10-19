@@ -82,13 +82,17 @@ time on another machine. Each one has an issue.
 `[tool.pydd.overrides.<package>]`, read by `lib/python/overrides.nix`, gives a
 node `env`, `config-settings`, `patches`, `pre-build`, `post-install`,
 `fixup` and `build-tools`. `[tool.pydd.from-nixpkgs]` replaces a node with a
-package of nixpkgs. What no key can say yet:
+package of nixpkgs. Two more keys change the resolution, nixidae/nixidae#850:
 
-- a runtime dependency that a distribution forgot to declare, or one it
-  declares and does not need;
-- a different artefact for one package, such as a fixed wheel at another URL.
+- `dependencies = { add, drop }` adds and drops edges of the package in the
+  walk of a `uv.lock` or a script lock. An added name must be in the lock, and
+  the lock pins its version. `poetry.lock` and `pylock.toml` are read flat:
+  an add pins the name when the package is selected, and a drop fails by name.
+- `artifact` replaces every artefact of the package with one file:
+  `{ url, hash }`, a path or a derivation. The file keeps the version of the
+  lock, and `.whl` in its name makes it a wheel.
 
-nixidae/nixidae#850 tracks both.
+`projects/script-edges` uses both.
 
 ## What comes next
 

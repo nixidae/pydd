@@ -16,15 +16,14 @@ from __future__ import annotations
 import re
 import sys
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
-from pydd.python._build_systems import UvLockReader
-from pydd.python._uvlock import Lock, LockError, select_lock
+from pydd.python._uvlock import EdgeEdit, Lock, LockError, build_requirements, select_lock
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -70,9 +69,11 @@ class ScriptProject:
     path: str
     lock: Lock
     requirements: tuple[Requirement, ...]
+    #: The edges that the overrides add and drop, by package.
+    edits: Mapping[str, EdgeEdit] = field(default_factory=dict[str, EdgeEdit])
 
     @classmethod
-    def from_json(cls, spec: Mapping[str, Any]) -> ScriptProject:
+    def from_json(cls, spec: Mapping[str, Any], edits: Mapping[str, EdgeEdit] | None = None) -> ScriptProject:
         with open(spec["lock"], "rb") as handle:
             document = tomllib.load(handle)
         locked = tuple(_manifest_requirement(entry) for entry in document.get("manifest", {}).get("requirements", []))
@@ -84,7 +85,7 @@ class ScriptProject:
                 f"{Path(spec['lock']).name} is stale: the script declares {sorted(map(str, declared))}, and the "
                 f"lock pins {sorted(map(str, locked))}. Run `uv lock --script` and build again."
             )
-        return cls(path=spec["lock"], lock=Lock.parse(document), requirements=locked)
+        return cls(path=spec["lock"], lock=Lock.parse(document), requirements=locked, edits=edits or {})
 
     def selection(self, target: Target) -> tuple[list[str], list[Any]]:
         """The pinned packages that this target installs, and no local tree."""
@@ -93,10 +94,13 @@ class ScriptProject:
             if requirement.marker is not None and not requirement.marker.evaluate(dict(target.markers)):
                 continue
             roots.setdefault(canonicalize_name(requirement.name), []).extend(requirement.extras)
-        selection = select_lock(self.lock, target.markers, roots)
+        selection = select_lock(self.lock, target.markers, roots, self.edits)
         pins = [f"{package.raw_name}=={package.version}" for package in selection.members]
         print(f"plan: the script lock selects {len(pins)} packages", file=sys.stderr)
         return pins, []
 
     def backend(self, requirements: Iterable[Requirement], target: Target, subject: str) -> list[Requirement]:
-        return UvLockReader(self.path).backend(requirements, target, subject)
+        try:
+            return build_requirements(self.lock, target.markers, requirements, self.edits)
+        except LockError as error:
+            raise RuntimeError(f"{subject}: {error}") from error

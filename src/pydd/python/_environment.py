@@ -53,6 +53,7 @@ from pydd.modes import root as choose_root
 from pydd.modes import submit
 from pydd.python import (
     Artifact,
+    EdgeEdit,
     LocalNode,
     Lock,
     LockError,
@@ -63,6 +64,7 @@ from pydd.python import (
     build_tools_from,
     check_freshness,
     choose,
+    edits_from,
     env,
     has_native_sources,
     overrides_from,
@@ -78,7 +80,7 @@ from pydd.python._workspace import members as members_of
 from pydd.python._workspace import selection
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Mapping
 
     from pydd.python._workspace import Choice
 
@@ -191,11 +193,14 @@ class UvProject:
     #: `tool.uv.default-groups` of each member, which is `["dev"]` when that
     #: table says nothing, and `"all"` is `--all-groups`.
     groups: Choice = None
+    #: The edges that the overrides add and drop, by package.
+    edits: Mapping[str, EdgeEdit] = field(default_factory=dict[str, EdgeEdit])
 
     @classmethod
-    def from_json(cls, spec: dict[str, Any]) -> UvProject:
+    def from_json(cls, spec: dict[str, Any], edits: Mapping[str, EdgeEdit] | None = None) -> UvProject:
         return cls(
             lock=Lock.read(spec["lock"]),
+            edits=edits or {},
             select=spec.get("select"),
             editables=spec.get("editables", {}),
             declarations=spec.get("declarations", {}),
@@ -243,7 +248,7 @@ class UvProject:
         """
         check_freshness(self.lock, self.declarations, self.workspace)
 
-        selection = select_lock(self.lock, target.markers, self.roots())
+        selection = select_lock(self.lock, target.markers, self.roots(), self.edits)
 
         roots: list[str] = []
         projects: list[LocalProject] = []
@@ -288,7 +293,7 @@ class UvProject:
         and what to do when the lock file does not hold the backend.
         """
         try:
-            return build_requirements(self.lock, target.markers, requirements)
+            return build_requirements(self.lock, target.markers, requirements, self.edits)
         except LockError as error:
             raise RuntimeError(f"{subject}: {error}") from error
 
@@ -550,15 +555,16 @@ def main() -> int:
     # and a `uv.lock` also names the local projects that install from their
     # own tree.
     roots: list[str] = list(inputs["roots"])
+    edits = edits_from(inputs)
     reader: UvProject | PoetryProject | PylockProject | ScriptProject | None = None
     if (spec := inputs.get("uv")) is not None:
-        reader = UvProject.from_json(spec)
+        reader = UvProject.from_json(spec, edits)
     elif (spec := inputs.get("poetry")) is not None:
-        reader = PoetryProject.from_json(spec)
+        reader = PoetryProject.from_json(spec, edits)
     elif (spec := inputs.get("pylock")) is not None:
-        reader = PylockProject.from_json(spec)
+        reader = PylockProject.from_json(spec, edits)
     elif (spec := inputs.get("script")) is not None:
-        reader = ScriptProject.from_json(spec)
+        reader = ScriptProject.from_json(spec, edits)
     if reader is not None:
         selected, local = reader.selection(target)
         roots += selected

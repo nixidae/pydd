@@ -655,6 +655,13 @@ $ nix run --file ../../.. pkgs.uv -- lock --script hello.py
 block's `dependencies` with `[manifest] requirements` of the lock, and refuses
 a lock that the block has outgrown: lock the script again after an edit.
 
+`script-edges` builds the same script with two overrides. `rich` drops
+`markdown-it-py` and `pygments` and adds `mdurl`, so the environment holds
+`rich` and `mdurl` only. `mdurl` installs from a copy of its wheel that
+`scripts/mark-wheel.py` marks with one module, and the check imports it.
+`script-edges-url` gives `mdurl` as `{ url, hash }` of its sdist instead, so
+the replacement builds from source.
+
 ## The two distributions that a project vendors
 
 `vendored-app/vendor` and `local-index/index` hold four small files, and no

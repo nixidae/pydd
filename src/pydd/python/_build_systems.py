@@ -18,9 +18,10 @@ from ._select import choose
 from ._uvlock import Lock, LockError, build_requirements
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
     from ._select import Artifact, Target
+    from ._uvlock import EdgeEdit
 
 
 class Reader(Protocol):
@@ -35,12 +36,13 @@ def _lock(path: str) -> Lock:
 class UvLockReader:
     """A `uv.lock`, as `Reader`."""
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, edits: Mapping[str, EdgeEdit] | None = None) -> None:
         self.path = path
+        self.edits = edits
 
     def backend(self, requirements: Iterable[Requirement], target: Target, subject: str) -> list[Requirement]:
         try:
-            return build_requirements(_lock(self.path), target.markers, requirements)
+            return build_requirements(_lock(self.path), target.markers, requirements, self.edits)
         except LockError as error:
             raise RuntimeError(f"{subject}: {error}") from error
 

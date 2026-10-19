@@ -857,6 +857,8 @@ let
 
     buildTools = chosenBuildTools;
     overrides = overridden.nodes;
+    inherit (overridden) dependencies;
+    artifactOverrides = overridden.artifacts;
     inherit builders allowImportFromDerivation;
     fromNixpkgs = chosenFromNixpkgs;
 

@@ -34,6 +34,7 @@ from pydd.python import (
     build_system,
     build_tools_from,
     choose,
+    edits_from,
     env,
     has_native_sources,
     overrides_from,
@@ -85,14 +86,15 @@ def main() -> int:
     # packages to import at all. A `uv.lock` holds the edges of every package
     # that it lists, so it expands the list when there is one.
     reader: build_systems.Reader | None = None
+    edits = edits_from(inputs)
     if (spec := inputs.get("uv")) is not None:
-        reader = build_systems.UvLockReader(spec["lock"])
+        reader = build_systems.UvLockReader(spec["lock"], edits)
     elif (spec := inputs.get("poetry")) is not None:
-        reader = PoetryProject.from_json(spec)
+        reader = PoetryProject.from_json(spec, edits)
     elif (spec := inputs.get("pylock")) is not None:
-        reader = PylockProject.from_json(spec)
+        reader = PylockProject.from_json(spec, edits)
     elif (spec := inputs.get("script")) is not None:
-        reader = ScriptProject.from_json(spec)
+        reader = ScriptProject.from_json(spec, edits)
     requirements = build_systems.backend(reader, requirements, target, sdist.filename, inputs.get("buildSystems"))
 
     # **The tools travel with the inputs, so a nested planner has them too.**

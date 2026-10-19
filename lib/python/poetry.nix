@@ -129,6 +129,8 @@ let
       ;
     buildTools = hintedBuildTools // overridden.buildTools // buildTools;
     overrides = overridden.nodes;
+    inherit (overridden) dependencies;
+    artifactOverrides = overridden.artifacts;
     artifacts = ownArtifacts ++ lib.optionals buildSystems fallback.rows;
     buildSystems = if buildSystems then fallback.lock else null;
     roots = [ ];

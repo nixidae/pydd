@@ -22,6 +22,14 @@ let
     pure-app = check ./check-uv.nix { };
     pylock-pure-app = check ./check-uv.nix { reader = pydd.python.pylock; };
     script-app = check ./check-script.nix { };
+    script-edges = check ./check-edges.nix { };
+    script-edges-url = check ./check-edges.nix {
+      mdurl = {
+        url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz";
+        hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba";
+      };
+      marker = false;
+    };
     packaged-app = check ./check-packaged.nix { };
     packaged-sdist = check ./check-sdist.nix { };
     workspace-all = check ./check-workspace.nix {

@@ -17,10 +17,20 @@
 #     fixup = false
 #     build-tools = ["openblas"]
 #
+#     [tool.pydd.overrides.rich]
+#     dependencies = { add = ["typing-extensions"], drop = ["pygments"] }
+#     artifact = { url = "https://example.org/rich-15.0.0-py3-none-any.whl", hash = "sha256-..." }
+#
 #     overrides.numpy = { configSettings = { ... }; patches = [ ./x.patch ]; };
 #
 # A patch in `pyproject.toml` is a path relative to the project. A build tool
 # there names an attribute of `pkgs`, and a dot walks into it.
+#
+# Two keys change the resolution, and not the node. `dependencies` adds and
+# drops edges of the package in the walk of the lock; an added name must be in
+# the lock already. `artifact` replaces every artefact of the package in the
+# menu with one file: `{ url, hash }`, a path (relative to the project in
+# `pyproject.toml`), or a derivation. The file keeps the version of the lock.
 {
   lib,
   pkgs,
@@ -41,6 +51,8 @@ let
     post-install = "postInstall";
     fixup = "fixup";
     build-tools = "buildTools";
+    dependencies = "dependencies";
+    artifact = "artifact";
   };
 
   refuse =
@@ -79,6 +91,8 @@ let
           map (path: project + "/${path}") value
         else if key == "build-tools" then
           map (attributeOf package) value
+        else if key == "artifact" && builtins.isString value then
+          project + "/${value}"
         else
           value
       )
@@ -101,8 +115,25 @@ in
     lib.filterAttrs (_: override: override ? buildTools) merged
   );
 
+  /** The edges that an override adds and drops, by package, as `{ add, drop }`. */
+  dependencies = lib.mapAttrs (_: override: override.dependencies) (
+    lib.filterAttrs (_: override: override ? dependencies) merged
+  );
+
+  /** The one artefact that replaces the artefacts of each package in the menu. */
+  artifacts = lib.mapAttrs (_: override: override.artifact) (
+    lib.filterAttrs (_: override: override ? artifact) merged
+  );
+
   /** Every other key, by package, for the `overrides` argument of `planner.nix`. */
   nodes = lib.filterAttrs (_: override: override != { }) (
-    lib.mapAttrs (_: override: removeAttrs override [ "buildTools" ]) merged
+    lib.mapAttrs (
+      _: override:
+      removeAttrs override [
+        "buildTools"
+        "dependencies"
+        "artifact"
+      ]
+    ) merged
   );
 }

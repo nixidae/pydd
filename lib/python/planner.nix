@@ -193,6 +193,12 @@
   # Per-package node overrides, by package name, from `./overrides.nix`.
   # `graph.nix` gives the meaning of each key, at `overridesOf`.
   overrides ? { },
+  # The edges that each package adds and drops in the walk of the lock, as
+  # `{ add, drop }`, by package name. `pydd.python.edits_from` reads them.
+  dependencies ? { },
+  # The one artefact that replaces every artefact of a package in the menu, by
+  # package name: `{ url, hash, filename? }`, a path or a derivation.
+  artifactOverrides ? { },
   # Whether an evaluator in a planner may build to import. `false`: a planner
   # writes derivations and builds none (`mkPlanner` of `lib/core`).
   allowImportFromDerivation ? false,
@@ -268,11 +274,73 @@ let
   # The artefacts, either as the caller gave them or as the lock file names
   # them. Each entry carries `drv`, which is a derivation and not a path, or
   # `path`, which names a file that this machine already holds.
-  entries =
+  given =
     if artifacts != null then
       artifacts
     else
       map (entry: (builtins.removeAttrs entry [ "url" ]) // { drv = fetch entry; }) lock.artifacts;
+
+  # **The replacement keeps the version of the lock.** The walk pins
+  # `name==<locked version>`, and `choose` drops a row outside that pin, so a
+  # version read from the new filename would make the package vanish.
+  replacement =
+    name: value: rows:
+    let
+      versions = pkgs.lib.unique (map (entry: entry.version) rows);
+      file =
+        if pkgs.lib.isDerivation value then
+          {
+            drv = value;
+            filename = value.name;
+          }
+        else if builtins.isAttrs value then
+          let
+            filename = value.filename or (baseNameOf (builtins.head (pkgs.lib.splitString "?" value.url)));
+          in
+          {
+            inherit filename;
+            drv = pkgs.fetchurl {
+              inherit (value) url hash;
+              name = filename;
+            };
+          }
+        else
+          {
+            path = "${value}";
+            filename = baseNameOf value;
+          };
+    in
+    if versions == [ ] then
+      throw "the artifact override of '${name}' replaces nothing: the lock holds no artefact of it"
+    else if builtins.length versions != 1 then
+      throw (
+        "the artifact override of '${name}' replaces ${toString (builtins.length versions)} versions "
+        + "of the lock (${builtins.concatStringsSep ", " versions}), and it names one file"
+      )
+    else
+      file
+      // {
+        package = (builtins.head rows).package;
+        version = builtins.head versions;
+        kind = if pkgs.lib.hasSuffix ".whl" file.filename then "wheel" else "sdist";
+      }
+      // pkgs.lib.optionalAttrs (builtins.all (entry: entry.buildSystems or false) rows) {
+        buildSystems = true;
+      };
+
+  replaced = pkgs.lib.mapAttrs' (
+    name: value: pkgs.lib.nameValuePair (normalise name) { inherit name value; }
+  ) artifactOverrides;
+
+  entries =
+    let
+      kept = builtins.filter (entry: !(replaced ? ${normalise (entry.package or "")})) given;
+      rowsOf = name: builtins.filter (entry: normalise (entry.package or "") == name) given;
+    in
+    kept
+    ++ pkgs.lib.mapAttrsToList (
+      key: override: replacement override.name override.value (rowsOf key)
+    ) replaced;
 
   # **The two `unsafeDiscard*` builtins are what keep the menu lazy.**
   # `unsafeDiscardOutputDependency` makes the `.drv` an input source of this
@@ -527,6 +595,7 @@ let
     mode.menu
     // buildToolPaths
     // overridePaths
+    // pkgs.lib.optionalAttrs (dependencies != { }) { inherit dependencies; }
     // stdenvTemplate
     // pkgs.lib.optionalAttrs (buildSystems != null) { buildSystems = "${buildSystems}"; }
     // {

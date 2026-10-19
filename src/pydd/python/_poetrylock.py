@@ -27,7 +27,7 @@ from packaging.markers import Marker
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
-from pydd.python._uvlock import LockError
+from pydd.python._uvlock import EdgeEdit, LockError, added_pins
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -53,12 +53,14 @@ class PoetryProject:
     groups: list[str] | None = None
     #: The extras of the project to enable.
     extras: list[str] = field(default_factory=list[str])
+    #: The edges that the overrides add, by package. `added_pins` refuses a drop.
+    edits: Mapping[str, EdgeEdit] = field(default_factory=dict[str, EdgeEdit])
 
     @classmethod
-    def from_json(cls, spec: Mapping[str, Any]) -> PoetryProject:
+    def from_json(cls, spec: Mapping[str, Any], edits: Mapping[str, EdgeEdit] | None = None) -> PoetryProject:
         with open(spec["lock"], "rb") as handle:
             lock = tomllib.load(handle)
-        return cls(lock=lock, groups=spec.get("groups"), extras=list(spec.get("extras") or []))
+        return cls(lock=lock, groups=spec.get("groups"), extras=list(spec.get("extras") or []), edits=edits or {})
 
     @property
     def packages(self) -> list[dict[str, Any]]:
@@ -102,6 +104,10 @@ class PoetryProject:
                 continue
             roots.append(f"{name}=={package['version']}")
 
+        pins = {
+            canonicalize_name(package["name"]): f"{package['name']}=={package['version']}" for package in self.packages
+        }
+        roots += added_pins(self.edits, (canonicalize_name(root.split("==")[0]) for root in roots), pins, "poetry.lock")
         print(f"plan: poetry.lock selects {len(roots)} packages", file=sys.stderr)
         return roots, []
 

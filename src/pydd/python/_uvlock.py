@@ -78,6 +78,71 @@ class LockError(Exception):
 
 
 @dataclass(frozen=True, slots=True)
+class EdgeEdit:
+    """The edges that an override adds to one package, and the names it drops.
+
+    `lib/python/overrides.nix` gives it as `dependencies = { add, drop }`. An
+    added requirement is a name with extras: the lock pins the version.
+    """
+
+    add: tuple[Requirement, ...] = ()
+    drop: frozenset[str] = frozenset()
+
+
+def edits_from(inputs: Mapping[str, Any]) -> dict[str, EdgeEdit]:
+    """The edge edit of each package, by PEP 503 name, from the inputs key `dependencies`."""
+    result: dict[str, EdgeEdit] = {}
+    for name, table in inputs.get("dependencies", {}).items():
+        unknown = set(table) - {"add", "drop"}
+        if unknown:
+            raise ValueError(
+                f"the dependencies override of '{name}' gives {sorted(unknown)}, and the keys are add, drop"
+            )
+        add = tuple(Requirement(text) for text in table.get("add", []))
+        for requirement in add:
+            if requirement.specifier or requirement.marker or requirement.url:
+                raise ValueError(
+                    f"the dependencies override of '{name}' adds '{requirement}'. An added edge is a name "
+                    "with extras: the lock pins the version, and the marker of the package decides."
+                )
+        drop = frozenset(canonicalize_name(text) for text in table.get("drop", []))
+        result[canonicalize_name(name)] = EdgeEdit(add=add, drop=drop)
+    return result
+
+
+def added_pins(edits: Mapping[str, EdgeEdit], selected: Iterable[str], pins: Mapping[str, str], lock: str) -> list[str]:
+    """The pins that the edits add to a flat selection, which walks no edge.
+
+    `selected` holds the PEP 503 name of each selected package, and `pins` the
+    pin of each package of the lock by that name. **A flat lock has no edge to
+    drop**, so a drop fails by name, and an added name gets its pin when the
+    package that adds it is selected.
+    """
+    for name, edit in edits.items():
+        if edit.drop:
+            raise LockError(
+                f"the dependencies override of '{name}' drops {sorted(edit.drop)}, and {lock} gives this "
+                "reader no edges to drop. Drop the package from the lock instead."
+            )
+    if unknown := set(edits) - set(pins):
+        raise LockError(f"the dependencies override names {sorted(unknown)}, and {lock} holds no such package")
+    chosen = set(selected)
+    added: list[str] = []
+    for name in sorted(chosen & set(edits)):
+        for requirement in edits[name].add:
+            wanted = canonicalize_name(requirement.name)
+            if wanted not in pins:
+                raise LockError(
+                    f"the dependencies override of '{name}' adds '{requirement.name}', and {lock} must hold "
+                    "it: add it to the project, lock again, and override the edge."
+                )
+            if wanted not in chosen:
+                chosen.add(wanted)
+                added.append(pins[wanted])
+    return added
+
+
+@dataclass(frozen=True, slots=True)
 class Known:
     """What one entry of an unambiguous name gives to an edge that omits it."""
 
@@ -511,12 +576,13 @@ def select_lock(
     lock: Lock,
     environment: Mapping[str, str],
     spec: Mapping[str, Sequence[str]],
+    edits: Mapping[str, EdgeEdit] | None = None,
 ) -> Selection:
     """The one package for each name that this target and selection need.
 
     `spec` maps the name of a root package to the extras and the groups to
     enable for it. The roots are the workspace members, and `lock.members`
-    names them.
+    names them. `edits` adds and drops edges of a package before the walk.
 
     Three steps, and `Installable::to_resolution` of uv takes the same three:
 
@@ -534,7 +600,7 @@ def select_lock(
     lock = filter_conflicts(lock, spec)
     lock.check_environment(environment)
 
-    live = _live(lock, environment)
+    live = _edited(lock, _live(lock, environment), environment, edits or {})
     # `canonicalize_name` gives a `NormalizedName`, which is a `str` under a
     # new name. The annotation keeps the key type plain, because a `Mapping`
     # is invariant in its key.
@@ -552,6 +618,7 @@ def build_requirements(
     lock: Lock,
     environment: Mapping[str, str],
     requirements: Iterable[Requirement],
+    edits: Mapping[str, EdgeEdit] | None = None,
 ) -> list[Requirement]:
     """The closure of a `build-system.requires`, as one exact pin for each name.
 
@@ -573,7 +640,7 @@ def build_requirements(
         return []
 
     try:
-        selection = select_lock(lock, environment, {name: [] for name in wanted})
+        selection = select_lock(lock, environment, {name: [] for name in wanted}, edits)
     except LockError as error:
         raise LockError(
             f"the lock file does not hold the build system {sorted(wanted)}. **uv.lock records no "
@@ -607,6 +674,56 @@ def _live(lock: Lock, environment: Mapping[str, str]) -> dict[PackageId, Package
         )
         for package in lock.packages
     }
+
+
+def _edited(
+    lock: Lock,
+    live: dict[PackageId, Package],
+    environment: Mapping[str, str],
+    edits: Mapping[str, EdgeEdit],
+) -> dict[PackageId, Package]:
+    """`live`, with the edges of each edited package added and dropped.
+
+    **A drop is checked against the lock as written, and not against `live`.**
+    A marker may remove the edge for this target, and the override is still
+    right for another one. A name that no edge of the package carries is a
+    typo, and it fails. So does an edit of a package that the lock does not hold.
+    """
+    if unknown := set(edits) - {package.name for package in lock.packages}:
+        raise LockError(f"the dependencies override names {sorted(unknown)}, and the lock holds no such package")
+    for package in lock.packages:
+        edit = edits.get(package.name)
+        if edit is None:
+            continue
+        written = {edge.name for edge in package.edges(package.optional_dependencies, package.dev_dependencies)}
+        if missing := edit.drop - written:
+            raise LockError(
+                f"the dependencies override of '{package.name}' drops {sorted(missing)}, and it has no such edge"
+            )
+        if package.id not in live:
+            continue
+        added: list[Edge] = []
+        for requirement in edit.add:
+            try:
+                target = lock.find(canonicalize_name(requirement.name), environment)
+            except LockError as error:
+                raise LockError(
+                    f"the dependencies override of '{package.name}' adds '{requirement.name}', and the lock "
+                    f"must hold it: add it to the project, lock again, and override the edge. ({error})"
+                ) from error
+            added.append(Edge(target=target.id, extras=tuple(sorted(requirement.extras))))
+
+        def kept(edges: tuple[Edge, ...], drop: frozenset[str] = edit.drop) -> tuple[Edge, ...]:
+            return tuple(edge for edge in edges if edge.name not in drop)
+
+        current = live[package.id]
+        live[package.id] = replace(
+            current,
+            dependencies=kept(current.dependencies) + tuple(added),
+            optional_dependencies={name: kept(edges) for name, edges in current.optional_dependencies.items()},
+            dev_dependencies={name: kept(edges) for name, edges in current.dev_dependencies.items()},
+        )
+    return live
 
 
 def _walk(live: Mapping[PackageId, Package], roots: Mapping[PackageId, set[str]]) -> dict[PackageId, Package]:

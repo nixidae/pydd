@@ -16,12 +16,13 @@ from __future__ import annotations
 
 import sys
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from packaging.pylock import Pylock, PylockValidationError
+from packaging.utils import canonicalize_name
 
-from pydd.python._uvlock import LockError
+from pydd.python._uvlock import EdgeEdit, LockError, added_pins
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -36,13 +37,15 @@ class PylockProject:
     """A `pylock.toml`, which is one selection."""
 
     lock: Pylock
+    #: The edges that the overrides add, by package. `added_pins` refuses a drop.
+    edits: Mapping[str, EdgeEdit] = field(default_factory=dict[str, EdgeEdit])
 
     @classmethod
-    def from_json(cls, spec: Mapping[str, Any]) -> PylockProject:
+    def from_json(cls, spec: Mapping[str, Any], edits: Mapping[str, EdgeEdit] | None = None) -> PylockProject:
         with open(spec["lock"], "rb") as handle:
             document = tomllib.load(handle)
         try:
-            return cls(lock=Pylock.from_dict(document))
+            return cls(lock=Pylock.from_dict(document), edits=edits or {})
         except PylockValidationError as error:
             raise LockError(f"{spec['lock']}: {error}") from error
 
@@ -82,6 +85,12 @@ class PylockProject:
                 raise LockError(f"pylock.toml gives {package.name} no version, and this reader pins each package")
             roots.append(f"{package.name}=={package.version}")
 
+        pins = {
+            canonicalize_name(package.name): f"{package.name}=={package.version}"
+            for package in self.lock.packages
+            if package.version is not None
+        }
+        roots += added_pins(self.edits, (canonicalize_name(root.split("==")[0]) for root in roots), pins, "pylock.toml")
         print(f"plan: pylock.toml selects {len(roots)} packages", file=sys.stderr)
         return roots, []
 

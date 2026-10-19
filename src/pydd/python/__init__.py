@@ -81,6 +81,9 @@ from ._uvlock import (
     Edge as Edge,
 )
 from ._uvlock import (
+    EdgeEdit as EdgeEdit,
+)
+from ._uvlock import (
     File as File,
 )
 from ._uvlock import (
@@ -102,6 +105,9 @@ from ._uvlock import (
     build_requirements as build_requirements,
 )
 from ._uvlock import (
+    edits_from as edits_from,
+)
+from ._uvlock import (
     filter_conflicts as filter_conflicts,
 )
 from ._uvlock import (
@@ -114,6 +120,7 @@ __all__ = [
     "PYPROJECT",
     "Artifact",
     "Edge",
+    "EdgeEdit",
     "File",
     "LocalNode",
     "Lock",
@@ -129,6 +136,7 @@ __all__ = [
     "build_tools_from",
     "check_freshness",
     "choose",
+    "edits_from",
     "env",
     "filter_conflicts",
     "has_native_sources",
