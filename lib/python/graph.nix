@@ -145,7 +145,9 @@ let
       { }
     else
       {
-        PATH = "${join ":" (root: "${root}/bin")}:${basePath}";
+        # `patchelf` as stdenv has it: meson-python asks for the wheel of it
+        # through its hook when `PATH` lacks the program (nixidae/nixidae#847).
+        PATH = "${join ":" (root: "${root}/bin")}:${basePath}:${tool.patchelf}/bin";
         # **`-g0` keeps the compiler out of the runtime closure.** A `.so` with
         # debug information records every include directory in its DWARF
         # sections, so the scan of the output finds the compiler, `glibc-dev`
@@ -433,6 +435,18 @@ let
       # this derivation for the artefact that the planner chose, so it is a
       # node of kind `nixpkgs` that a user wrote.
       fetched node.artifact
+    else if node.kind == "backend" then
+      # The sites of a backend, as text. The output's references are those
+      # sites, so a planner that takes it has the backend built and can ask
+      # its `get_requires_for_build_*` (nixidae/nixidae#847).
+      mk {
+        name = node.name;
+        args = [
+          "-c"
+          ''echo "$backendPath" > "$out"''
+        ];
+        backendPath = builtins.concatStringsSep ":" (map sitePath node.backendPath);
+      }
     else if node.kind == "venv" then
       # A real virtual environment, with `venv.EnvBuilder`, and the members
       # merged into it. `make-venv.py` runs under the interpreter that the

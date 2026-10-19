@@ -59,4 +59,5 @@ def test_the_oracle_covers_every_kind() -> None:
         "venv",
         "application",
         "planned",
+        "backend",
     }

@@ -281,6 +281,12 @@ let
       venv = "app-env";
       bases = [ "app-editable" ];
     }
+    {
+      name = "idna-backend";
+      kind = "backend";
+      platform = false;
+      backendPath = [ "flit-sdist" ];
+    }
   ];
 
   document = {

@@ -387,6 +387,16 @@ class Plan:
         self.nodes[index] = entry
         self._seen[name] = entry
 
+    def backend_node(self, name: str, *, backend_path: Sequence[str]) -> str:
+        """Add the node that realises a backend environment, and names its sites.
+
+        **This is the root of the first of two planners of one build.** The
+        second asks the backend's `get_requires_for_build_*`, and only a built
+        backend can answer, so it takes this output as an input: its text names
+        each site, and so its closure holds them (nixidae/nixidae#847).
+        """
+        return self.add({"name": name, "kind": "backend", "platform": False, "backendPath": list(backend_path)})
+
     def venv_node(self, name: str) -> str:
         """Add the node that composes the members into an environment."""
         return self.add(

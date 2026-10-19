@@ -171,7 +171,14 @@ class Graph:
         if not roots:
             return {}
         return {
-            "PATH": cat(join(":", (cat(root, "/bin") for root in roots)), ":", self.base_path),
+            "PATH": cat(
+                join(":", (cat(root, "/bin") for root in roots)),
+                ":",
+                self.base_path,
+                ":",
+                self.tool["patchelf"],
+                "/bin",
+            ),
             "CPPFLAGS": cat("-g0 ", join(" ", (cat("-isystem ", root, "/include") for root in roots))),
             "LDFLAGS": join(" ", (cat("-L", root, "/lib") for root in roots)),
             "PKG_CONFIG_PATH": join(":", (cat(root, "/lib/pkgconfig") for root in roots)),
@@ -278,6 +285,14 @@ class Graph:
                 )
             case "nixpkgs" | "host":
                 return self.fetched(node["artifact"])
+            case "backend":
+                return self.mk(
+                    {
+                        "name": node["name"],
+                        "args": [Text("-c"), Text('echo "$backendPath" > "$out"')],
+                        "backendPath": self.backend_path(node),
+                    }
+                )
             case "venv":
                 return self.mk(
                     {

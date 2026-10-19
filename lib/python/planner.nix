@@ -649,14 +649,43 @@ let
   # fails with "opening file ...: No such file or directory". Instantiating it
   # out here makes the `.drv` an input source of the outer planner, so the read
   # succeeds. `docs/NIX-FACTS.md` holds the measurement.
+  #
+  # **Each archive takes two planners of the same program** (nixidae/nixidae#847).
+  # The `backend` role submits the backend's environment. The `build` role
+  # takes that environment built, asks the backend's
+  # `get_requires_for_build_wheel`, and submits the build with the answer on
+  # its path. Only a built backend can answer, and a planner can depend on the
+  # output of another only when both are instantiated here.
   sdistPlanner =
     depth: entry:
-    (mkPythonPlanner {
-      # The root that this planner submits is `<package>-<version>.drv`, and
+    let
+      backend = sdistPlannerAs depth entry "backend" "${entry.package}-${entry.version}-backend" { };
+    in
+    (sdistPlannerAs depth entry "build" "${entry.package}-${entry.version}" {
+      PYDD_BACKEND = backend.out;
+      # The interpreter of the target runs the hook, as it runs the build.
+      PYDD_PYTHON = "${python}/bin/${python.executable}";
+      # **The hook sees the tools that the build sees.** mesonpy asks for
+      # `ninja` and `patchelf`, and scikit-build-core for `cmake` and `ninja`,
+      # only when `PATH` lacks the program, and no lock holds those wheels.
+      PYDD_HOOK_PATH = builtins.concatStringsSep ":" (
+        map (tool: "${tool}/bin") (
+          let
+            roots = buildTools.${entry.package} or [ ];
+          in
+          roots ++ pkgs.lib.optional (roots != [ ]) pkgs.patchelf
+        )
+      );
+    }).planner;
+
+  sdistPlannerAs =
+    depth: entry: role: name: roleEnv:
+    mkPythonPlanner {
       # Nix requires the planner to carry the name of what it submits.
-      name = "${entry.package}-${entry.version}";
+      inherit name;
       main = "_sdist_planner";
-      env = plannerEnv // {
+      env = plannerEnv // roleEnv // {
+        PYDD_ROLE = role;
 
         # **The archive is a real dependency of this derivation.** That is the
         # whole point: this planner reads a file that no evaluation can read,
@@ -690,7 +719,7 @@ let
           // pkgs.lib.optionalAttrs (entry ? subdirectory) { inherit (entry) subdirectory; }
         );
       };
-    }).planner;
+    };
 
   # **The levels are a list, and not a recursive function, because a list is a
   # memo.** Nix evaluates each element of a list at most once, and it

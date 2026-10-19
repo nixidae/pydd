@@ -1841,22 +1841,39 @@ function returns `[*builder.config.dependencies, EDITABLES_REQUIREMENT]`. PEP
 what comes back, and adds it to the build environment. The next section says
 why this lab cannot, and what it pays instead.
 
-### `get_requires_for_build_*` is the hook that this lab does not call
+### `get_requires_for_build_*` needs a second planner
 
 A frontend of PEP 517 builds the environment of a backend in two steps: it
 installs `build-system.requires`, and it then asks the backend what more it
-needs. `ddrn` performs the first step only.
+needs.
 
-The reason is where each step would run. The plan is decided in the sandbox of
-the planner, and the backend is not installed there. A hook could run in the
-node that builds, which is where the backend does exist, but that node has no
+The plan is decided in the sandbox of the planner, and the backend is not
+installed there. The node that builds has the backend, but that node has no
 index, no store connection and no way to add a member to a graph that is
-already registered. So a requirement that arrives from the hook arrives after
-the only moment that could act on it.
+already registered. So one planner cannot take both steps.
 
-What the lab pays instead is one line for each such package in the `ddrn`
-dependency group of the project, and `editables` is the one case that a project
-here has met. What it costs is that nothing checks the list: a backend that
+**Two planners can, for a source distribution** (nixidae/nixidae#847). The
+host makes both, from one program. The first submits the backend's
+environment, a node whose text names each site. The second takes that output
+as an input, so the backend is built when it runs. It calls the hook with the
+target's interpreter, chooses each answer from the menu, and submits the build.
+`projects/hook-probe` fails in every mode without it, with
+`ModuleNotFoundError: No module named 'hookprobe_extra'`.
+
+**The hook reads `PATH`, so it runs with the build's tools.** mesonpy answers
+`ninja>=1.8.2` and `patchelf>=0.11.0`, and scikit-build-core answers
+`cmake>=3.15` and `ninja>=1.5`, each only when `PATH` lacks the program. With
+an empty `PATH` both asked for wheels that no lock holds, and `numpy-sdist`
+and `zmq-sdist` failed. The hook therefore sees the package's build tools and
+pydd's `patchelf`, and the node that builds sees the same `PATH`. The answer comes from
+the same menu as everything else, so a package that no lock lists still fails,
+but by name. Each archive pays one more planner on its critical path: about
+3.5 s, the step between a one-planner project and a one-sdist project in
+`_generated/measurements.md`.
+
+**A local project still calls no hook.** What it pays instead is one line for
+each such package in the `ddrn` dependency group of the project, and
+`editables` is the one case that a project here has met. What it costs is that nothing checks the list: a backend that
 asks for a package through the hook, and a group that does not name it, fails
 in the build with `ModuleNotFoundError`.
 

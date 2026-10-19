@@ -21,7 +21,11 @@ becomes another node of kind `sdist`, which is another planner.
 from __future__ import annotations
 
 import json
+import os
 import sys
+from pathlib import Path
+
+from packaging.utils import canonicalize_name
 
 from pydd.core import writer_from_environ
 from pydd.modes import submit
@@ -38,6 +42,7 @@ from pydd.python import (
     target_from_environ,
 )
 from pydd.python import _build_systems as build_systems
+from pydd.python._hook import requires_for_build
 from pydd.python._poetrylock import PoetryProject
 
 
@@ -112,7 +117,44 @@ def main() -> int:
         backend_path.append(plan.artifact_node(dependency, dependency.kind))
         print(f"plan-sdist:   backend {dependency.filename} for {requirement}", file=sys.stderr)
 
-    root = plan.artifact_node(sdist, "sdist-build", backend=backend, backend_path=backend_path)
+    # **Two planners build one archive, and this one is either.** `backend`
+    # stops at the backend's environment. `build` takes that environment, built,
+    # asks the backend what more it needs, and adds that to the path.
+    if os.environ.get("PYDD_ROLE") == "backend":
+        root = plan.backend_node(f"{sdist.node_name}-backend", backend_path=backend_path)
+    else:
+        sites = Path(env("PYDD_BACKEND")).read_text().strip()
+        override = plan.overrides.get(canonicalize_name(sdist.package), {})
+        extra = requires_for_build(
+            hook="wheel",
+            python=env("PYDD_PYTHON"),
+            archive=archive,
+            subdirectory=subdirectory,
+            backend=backend,
+            sites=[site for site in sites.split(":") if site],
+            config_settings=override.get("configSettings"),
+            path=os.environ.get("PYDD_HOOK_PATH", ""),
+            env=override.get("env"),
+        )
+        extra = [
+            requirement
+            for requirement in extra
+            if target.accepts(str(requirement.marker) if requirement.marker else None)
+        ]
+        if extra:
+            print(f"plan-sdist:   {backend} asks for {[str(requirement) for requirement in extra]}", file=sys.stderr)
+            extra = build_systems.backend(reader, extra, target, sdist.filename, inputs.get("buildSystems"))
+        for requirement in extra:
+            dependency = choose(artifacts, requirement, target, no_binary)
+            if dependency is None:
+                raise RuntimeError(
+                    f"{sdist.filename}: {backend} asks for '{requirement}' through get_requires_for_build_wheel, "
+                    "and no artefact of the menu satisfies it. Add it to a dependency group of the project."
+                )
+            name = plan.artifact_node(dependency, dependency.kind)
+            if name not in backend_path:
+                backend_path.append(name)
+        root = plan.artifact_node(sdist, "sdist-build", backend=backend, backend_path=backend_path)
 
     print(f"==> {len(plan.nodes)} nodes for {sdist.filename}", file=sys.stderr)
 
