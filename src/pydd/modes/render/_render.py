@@ -118,7 +118,8 @@ class Graph:
         self.nodes: dict[str, dict[str, Any]] = {node["name"].text: node for node in self.doc["nodes"]}
         self.paths: dict[str, str] = {}
         self._built: dict[str, Text] = {}
-        self.site = f"lib/python{self.doc['pythonVersion'].text}/site-packages"
+        self.site = self.doc["interpreter"]["sitePackages"].text
+        self.python = cat(self.tool["python"], "/bin/", self.doc["interpreter"]["executable"])
         self.base_path = join(
             ":", (cat(self.tool[name], "/bin") for name in ["coreutils", "unzip", "gnutar", "gzip", "python", "bash"])
         )
@@ -154,7 +155,7 @@ class Graph:
         return artifact["path"] if "path" in artifact else artifact["out"]
 
     def runs(self, script: str) -> list[Text]:
-        return [Text("-c"), cat('exec "', self.tool["python"], '/bin/python3" "', self.script[script], '"')]
+        return [Text("-c"), cat('exec "', self.python, '" "', self.script[script], '"')]
 
     def patchelf_inputs(self) -> dict[str, Text]:
         tool = self.tool
@@ -302,6 +303,7 @@ class Graph:
         attrs: dict[str, Any] = {
             "system": self.doc["system"],
             "site": Text(self.site),
+            "python": self.python,
             "builder": cat(self.tool["bash"], "/bin/bash"),
             "PATH": self.base_path,
             "SOURCE_DATE_EPOCH": Text("315532800"),
@@ -326,6 +328,7 @@ class Graph:
                 "outputHashMode": Text("recursive"),
                 "outputHashAlgo": Text("sha256"),
                 "site": Text(self.site),
+                "python": self.python,
                 "nativeBuildInputs": [*roots, *stdenv["nativeBuildInputs"], self.tool["python"], self.tool["unzip"]],
                 "buildInputs": roots,
                 "dontUnpack": True,

@@ -1,4 +1,4 @@
-"""Write the two wheels of `index/`: one per ABI of CPython 3.13.
+"""Write the wheels of `index/`: one per ABI of CPython 3.13, and one for PyPy 3.11.
 
 Run from this directory, then `uv lock`. Each wheel says which ABI it was
 chosen for, so the check reads the choice from inside the environment.
@@ -20,8 +20,8 @@ def record_hash(data: bytes) -> str:
     return f"sha256={digest}"
 
 
-def write_wheel(abi: str, says: str) -> None:
-    tag = f"cp313-{abi}-linux_x86_64"
+def write_wheel(interpreter: str, abi: str, says: str) -> None:
+    tag = f"{interpreter}-{abi}-linux_x86_64"
     dist_info = "abiprobe-1.0.0.dist-info"
     files = {
         "abiprobe.py": f"ABI = {says!r}\n",
@@ -42,5 +42,6 @@ def write_wheel(abi: str, says: str) -> None:
 
 
 if __name__ == "__main__":
-    write_wheel("cp313", "gil")
-    write_wheel("cp313t", "free-threaded")
+    write_wheel("cp313", "cp313", "gil")
+    write_wheel("cp313", "cp313t", "free-threaded")
+    write_wheel("pp311", "pypy311_pp73", "pypy")

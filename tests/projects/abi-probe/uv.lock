@@ -1,6 +1,6 @@
 version = 1
 revision = 5
-requires-python = "==3.13.*"
+requires-python = ">=3.11"
 
 [[package]]
 name = "abi-probe"
@@ -20,4 +20,5 @@ source = { registry = "index" }
 wheels = [
     { path = "abiprobe-1.0.0-cp313-cp313-linux_x86_64.whl" },
     { path = "abiprobe-1.0.0-cp313-cp313t-linux_x86_64.whl" },
+    { path = "abiprobe-1.0.0-pp311-pypy311_pp73-linux_x86_64.whl" },
 ]

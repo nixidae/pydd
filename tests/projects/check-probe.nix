@@ -2,7 +2,8 @@
 #
 # Each wheel of a probe's index names itself in one attribute of one module.
 # `abi-probe` names the ABI, which a free-threaded target gets from
-# `PYDD_TARGET` or not at all (nixidae/nixidae#842). `platform-probe` names
+# `PYDD_TARGET` or not at all (nixidae/nixidae#842), and a PyPy target gets a
+# `pp311` wheel and an interpreter with no `python3` (#845, #855). `platform-probe` names
 # the platform tag, which the target's libc decides (nixidae/nixidae#843).
 {
   pkgs,

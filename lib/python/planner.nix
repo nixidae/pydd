@@ -534,6 +534,7 @@ let
       artifacts = map row entries;
       tools = builtins.mapAttrs (_: tool: if builtins.isList tool then map built tool else built tool) tools;
       inherit scripts;
+      interpreter = { inherit (python) executable sitePackages; };
       # The planner reads the `pyproject.toml` of each tree below, and resolves
       # the backend that the tree asks for against the same lock file.
       editables = pkgs.lib.mapAttrs (_: spec: {

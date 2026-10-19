@@ -39,7 +39,7 @@ cp "$wheel" "./$wheelName"
 # The interpreter that runs the install is the one whose shebang each console
 # script gets. `make-venv.py` rewrites that shebang to the `bin/python` of the
 # environment, which is what makes a script find the packages beside it.
-PYTHONPATH="$installerPath" python3 -m installer --prefix "$out" "./$wheelName"
+PYTHONPATH="$installerPath" "$python" -m installer --prefix "$out" "./$wheelName"
 
 # **A wheel that carries a binary is built for a different Linux.** A manylinux
 # wheel names `/lib64/ld-linux-x86-64.so.2` as its ELF interpreter and gives no

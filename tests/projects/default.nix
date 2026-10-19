@@ -113,6 +113,12 @@ let
       python = pkgs.python313FreeThreading;
       expected = "free-threaded";
     };
+    abi-pypy = check ./check-probe.nix {
+      project = ./abi-probe;
+      probe = "abiprobe.ABI";
+      python = pkgs.pypy3;
+      expected = "pypy";
+    };
     # glibc 2.44 at the time of writing. The check names the version it
     # expects, so a glibc below 2.40 fails it on purpose.
     platform-glibc = check ./check-probe.nix {

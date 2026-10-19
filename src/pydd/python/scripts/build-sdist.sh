@@ -63,8 +63,8 @@ cd "$project"
 # **A frontend puts the scripts of the build environment on PATH**, as pip and
 # `build` do. meson runs `cython` as a program, and not as a module.
 IFS=: read -ra backendSites <<<"$backendPath"
-for site in "${backendSites[@]}"; do
-  PATH="${site%/lib/python*/site-packages}/bin:$PATH"
+for backendSite in "${backendSites[@]}"; do
+  PATH="${backendSite%/"$site"}/bin:$PATH"
 done
 export PATH
 read -ra patchFiles <<<"${patches:-}"
@@ -74,7 +74,7 @@ done
 eval "${preBuild:-}"
 # The backend runs with the built backend nodes on its path, and with nothing
 # else. There is no network here, and no index.
-PYTHONPATH="$backendPath" python3 -c '
+PYTHONPATH="$backendPath" "$python" -c '
 import importlib
 import json
 import os
@@ -112,12 +112,12 @@ cd "$root"
 # The wheel that this node built goes through the same installer as one that
 # the lock file named, so both give the same shape of output.
 for built in "$root"/wheel/*.whl; do
-  PYTHONPATH="$installerPath" python3 -m installer --prefix "$out" "$built"
+  PYTHONPATH="$installerPath" "$python" -m installer --prefix "$out" "$built"
 done
 
 (cd "$project" && eval "${postInstall:-}")
 
 # A node with build tools fixes the RUNPATH of what it built.
 if [ -n "${fixupElf:-}" ]; then
-  python3 "$fixupElf" "$out"
+  "$python" "$fixupElf" "$out"
 fi

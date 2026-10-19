@@ -290,7 +290,10 @@ let
       scripts
       nodes
       ;
-    pythonVersion = "3.13";
+    interpreter = {
+      executable = "python3.13";
+      sitePackages = "lib/python3.13/site-packages";
+    };
     installer = "installer-bootstrap";
     root = "app";
   };

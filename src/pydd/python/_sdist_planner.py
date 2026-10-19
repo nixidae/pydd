@@ -121,7 +121,6 @@ def main() -> int:
         plan.document(
             root=root,
             system=env("PYDD_SYSTEM"),
-            python_version=target.python_version,
             inputs=inputs,
         ),
     )

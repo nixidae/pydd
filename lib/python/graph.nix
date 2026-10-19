@@ -10,7 +10,9 @@
 # socket, and the planner then submits the root.
 {
   system,
-  pythonVersion,
+  # `{ executable, sitePackages }` of the interpreter, as nixpkgs names them:
+  # PyPy has no `python3`, and its packages live under `lib/pypy3.Y`.
+  interpreter,
   # Each tool as `{ drv, out, output }`, the way an artefact travels, so a
   # node reads the tool's output and names its derivation as an input.
   tools,
@@ -62,7 +64,8 @@ let
     outputHashAlgo = "sha256";
   };
 
-  site = "lib/python${pythonVersion}/site-packages";
+  site = interpreter.sitePackages;
+  python = "${tool.python}/bin/${interpreter.executable}";
 
   # **`bash` is on the path, and not only the builder.** A backend that runs
   # Ninja or Make starts each command through `sh`, and the Ninja of nixpkgs
@@ -73,7 +76,7 @@ let
     args:
     derivation (
       {
-        inherit system site;
+        inherit system site python;
         builder = "${tool.bash}/bin/bash";
         PATH = basePath;
         # **Without this, no node of this graph is reproducible.**
@@ -226,7 +229,7 @@ let
         // overridesOf node
         // floating
         // {
-          inherit site;
+          inherit site python;
           nativeBuildInputs =
             roots
             ++ hooks
@@ -293,7 +296,7 @@ let
           name = node.name;
           args = [
             "-c"
-            ''exec "${tool.python}/bin/python3" "${script.buildLocal}"''
+            ''exec "${python}" "${script.buildLocal}"''
           ];
           mode = "editable";
           source = node.source;
@@ -322,7 +325,7 @@ let
           name = node.name;
           args = [
             "-c"
-            ''exec "${tool.python}/bin/python3" "${script.buildLocal}"''
+            ''exec "${python}" "${script.buildLocal}"''
           ];
           mode = "wheel";
           source = node.source;
@@ -347,7 +350,7 @@ let
           name = node.name;
           args = [
             "-c"
-            ''exec "${tool.python}/bin/python3" "${script.buildLocal}"''
+            ''exec "${python}" "${script.buildLocal}"''
           ];
           mode = "sdist";
           source = node.source;
@@ -438,7 +441,7 @@ let
         name = node.name;
         args = [
           "-c"
-          ''exec "${tool.python}/bin/python3" "${script.makeVenv}"''
+          ''exec "${python}" "${script.makeVenv}"''
         ];
         members = builtins.concatStringsSep " " (map (name: "${built.${name}}") node.members);
         installed = builtins.concatStringsSep "\n" node.installed;
@@ -452,7 +455,7 @@ let
         name = node.name;
         args = [
           "-c"
-          ''exec "${tool.python}/bin/python3" "${script.makeApplication}"''
+          ''exec "${python}" "${script.makeApplication}"''
         ];
         venv = "${built.${node.venv}}";
         bases = builtins.concatStringsSep " " (map (name: "${built.${name}}") node.bases);

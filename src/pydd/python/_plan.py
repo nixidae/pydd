@@ -471,11 +471,11 @@ class Plan:
         self.installed.append(label)
         self.by_package[canonicalize_name(package)] = name
 
-    def document(self, *, root: str, system: str, python_version: str, inputs: dict[str, Any]) -> dict[str, Any]:
+    def document(self, *, root: str, system: str, inputs: dict[str, Any]) -> dict[str, Any]:
         """The whole document, ready for `graph.nix`."""
         return {
             "system": system,
-            "pythonVersion": python_version,
+            "interpreter": inputs["interpreter"],
             "tools": inputs["tools"],
             "scripts": inputs["scripts"],
             "nodes": self.nodes,
