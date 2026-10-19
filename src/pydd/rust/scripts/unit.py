@@ -8,8 +8,8 @@ A compile writes `$out/lib/<file>` (or `$out/bin/<name>`) and
 `[flag, value]` pairs: cargo passes `rustc-link-search` on to every
 dependent, and `rustc-link-lib` and the link arguments to the package
 alone. A run of a
-build script writes `OUT_DIR` to `$out/out` and what the script printed, by
-kind, to `$out/flags.json`.
+build script writes `OUT_DIR` under `$out/target`, laid out as cargo lays
+it out, and what the script printed, by kind, to `$out/flags.json`.
 """
 
 import json
@@ -79,7 +79,12 @@ def prepare():
     link = []
     if script := unit["build_script"]:
         printed = read_json(f"{script}/flags.json", {})
-        env["OUT_DIR"] = f"{script}/out"
+        # Cargo's OUT_DIR stays writable while the crate compiles, and
+        # tauri's `generate_context!` writes compressed assets into it.
+        out_dir = os.path.join(os.environ.get("NIX_BUILD_TOP", "/tmp"), "out")
+        subprocess.run(["cp", "-r", printed.get("out_dir", f"{script}/out"), out_dir], check=True)
+        subprocess.run(["chmod", "-R", "u+w", out_dir], check=True)
+        env["OUT_DIR"] = out_dir
         env |= printed["env"]
         for cfg in printed["cfg"]:
             flags += ["--cfg", cfg]
@@ -172,7 +177,11 @@ def parse_cfg(text):
 
 
 def run_unit():
-    out_dir = f"{out}/out"
+    # Cargo's `target/<profile>/build/<package>-<hash>/out`. tauri-build
+    # finds its target directory as the parent of the ancestor named
+    # `build`, and other scripts go up three levels; both land on
+    # `$out/target/<profile>`.
+    out_dir = f"{out}/target/{unit['env']['PROFILE']}/build/{unit['env']['CARGO_PKG_NAME']}/out"
     os.makedirs(out_dir)
     env = dict(os.environ) | unit["env"] | {"OUT_DIR": out_dir}
     cfg = subprocess.run(
@@ -182,11 +191,29 @@ def run_unit():
     for dependency in unit["metadata_from"]:
         env |= read_json(f"{dependency}/flags.json", {}).get("metadata", {})
 
-    result = subprocess.run([unit["program"]], cwd=unit["cwd"], env=env, stdout=subprocess.PIPE, text=True, check=True)
-    sys.stderr.write(result.stdout)
+    cwd = unit["cwd"]
+    root = copy = None
+    if unit.get("writable"):
+        # Cargo leaves a workspace member's source writable, and tauri-build
+        # writes into it. The copy's path goes back to the store path in what
+        # the script prints, so a printed source path still resolves.
+        root = "/".join(cwd.split("/")[:4])
+        copy = os.path.join(os.environ.get("NIX_BUILD_TOP", "/tmp"), "source")
+        subprocess.run(["cp", "-r", root, copy], check=True)
+        subprocess.run(["chmod", "-R", "u+w", copy], check=True)
+        cwd = copy + cwd.removeprefix(root)
+        for name in ("CARGO_MANIFEST_DIR", "CARGO_MANIFEST_PATH"):
+            env[name] = copy + env[name].removeprefix(root)
+    # Not `check=True`: a failing script often says why on stdout only, as
+    # tauri-build does, and the log must show it before the unit fails.
+    result = subprocess.run([unit["program"]], cwd=cwd, env=env, stdout=subprocess.PIPE, text=True)
+    stdout = result.stdout if copy is None else result.stdout.replace(copy, root)
+    sys.stderr.write(stdout)
+    if result.returncode != 0:
+        sys.exit(f"pydd: the build script of {unit['cwd']} failed with exit status {result.returncode}.")
     printed = {"cfg": [], "env": {}, "search": [], "libs": [], "args": [], "metadata": {}}
     links = (unit["links"] or "").upper().replace("-", "_")
-    for line in result.stdout.splitlines():
+    for line in stdout.splitlines():
         if not line.startswith("cargo:"):
             continue
         key, _, value = line.removeprefix("cargo:").removeprefix(":").partition("=")
@@ -221,7 +248,7 @@ def run_unit():
                 pass
             case _ if links and line.startswith("cargo:") and not line.startswith("cargo::"):
                 printed["metadata"][f"DEP_{links}_{key.upper()}"] = value
-    write_json(f"{out}/flags.json", printed)
+    write_json(f"{out}/flags.json", printed | {"out_dir": out_dir})
 
 
 if __name__ == "__main__":

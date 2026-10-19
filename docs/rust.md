@@ -58,7 +58,19 @@ A build script also gets `CARGO`, `RUSTC`, `TARGET`, `HOST`, `PROFILE`,
 `OPT_LEVEL`, `DEBUG`, the `CARGO_CFG_*` of the target and the
 `CARGO_FEATURE_*` of the unit, as from cargo. `rustc-check-cfg` is
 dropped: rustc then checks no cfg names, and a check warns and fails
-nothing.
+nothing. `CARGO_MANIFEST_LINKS` comes with `links`.
+
+**A build script sees cargo's filesystem.** tauri-build was the test:
+
+- `OUT_DIR` is `$out/target/<profile>/build/<package>/out`, as cargo lays
+  it out. A script that finds the target directory by walking up to
+  `build`, or three levels, finds `$out/target/<profile>`.
+- A workspace member's script runs in a writable copy of the source,
+  because cargo leaves the checkout writable and tauri-build writes into
+  it. The copy's path goes back to the store path in what it prints.
+- The crate compiles against a writable copy of `OUT_DIR`: tauri's
+  `generate_context!` writes compressed assets there at compile time.
+- A failing script's stdout reaches the log. Many say why only there.
 
 **`-C metadata` comes from what cargo decided.** It hashes the package ID,
 the target, the mode, the platform, the features, the profile and the

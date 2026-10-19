@@ -485,6 +485,9 @@ class Graph:
         # ring's build script checks it against its own version.
         if package.get("links"):
             env["CARGO_MANIFEST_LINKS"] = package["links"]
+        # Only a member's script writes into its source, so only a member
+        # pays for the copy.
+        writable = {"writable": True} if unit["pkg_id"] in self.members else {}
         return {
             "action": "run",
             "program": f"{self.nodes[program].output()}/bin/build-script-build",
@@ -498,6 +501,7 @@ class Graph:
                 if self.units[dep["index"]]["mode"] == RUN
             ],
             "env": env,
+            **writable,
         }
 
     def tests(self) -> Node:
