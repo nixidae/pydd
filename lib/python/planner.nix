@@ -597,6 +597,9 @@ let
   targetEnv = {
     PYDD_TARGET = builtins.toJSON {
       pythonVersion = pkgs.lib.versions.majorMinor python.version;
+      # `cp313t` for a free-threaded build. `abi3` and `none` are left to
+      # `packaging`, which adds them when the ABI allows.
+      abis = builtins.filter (tag: tag != "abi3" && tag != "none") python.pythonABITags;
       # The platform of a wheel tag, which PEP 425 spells differently from
       # `platform_machine`.
       platform = "${if hostPlatform.isDarwin then "macosx" else "linux"}_${hostPlatform.parsed.cpu.name}";

@@ -29,7 +29,7 @@ time on another machine. Each one has an issue.
 | PEP 425 tags, CPython | delegated | `_select.target_tags`, `cpython_tags` and `compatible_tags` |
 | PEP 427 build tag breaks a tie | covered | `_select.build_tag` |
 | PEP 384 stable ABI (`abi3`) | delegated | `cpython_tags`; the pyzmq case in `target_tags` |
-| ABI flags `t` (free-threaded) and `d` (debug) | **wrong**, nixidae/nixidae#842 | `cpython_tags` reads `Py_GIL_DISABLED` and `Py_DEBUG` from the planner's interpreter, and the planner runs `python3`, not the target |
+| ABI flags `t` (free-threaded) and `d` (debug) | covered, nixidae/nixidae#842 | `planner.nix` passes the target's `pythonABITags` in `PYDD_TARGET`, and `target_tags` gives them to `cpython_tags`, which would otherwise read the planner's interpreter. `projects/abi-probe` |
 | PEP 600 `manylinux_2_Y` | **wrong**, nixidae/nixidae#843 | `_select.GLIBC_MINORS` is 17 to 39 for every target. The target's glibc is not read, so a `manylinux_2_40` wheel is refused on a glibc 2.44 target |
 | PEP 656 `musllinux` | missing, nixidae/nixidae#846 | `target_platforms` knows `linux_` and nothing else |
 | macOS platform tags | **wrong**, nixidae/nixidae#844 | `planner.nix` writes `macosx_<cpu>`, as `macosx_aarch64`. No wheel carries that tag, so a darwin target takes no binary wheel and builds every source distribution |

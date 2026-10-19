@@ -213,7 +213,7 @@ def target_platforms(platform: str) -> list[str]:
     ]
 
 
-def target_tags(python_version: str, platform: str) -> list[Tag]:
+def target_tags(python_version: str, platform: str, abis: Sequence[str] = ()) -> list[Tag]:
     """The tags this environment accepts, in the order that pip prefers them.
 
     **`packaging` computes this, and this function only states the target.**
@@ -227,11 +227,18 @@ def target_tags(python_version: str, platform: str) -> list[Tag]:
     missed the stable ABI: `pyzmq` 27.1.0 ships one `cp312-abi3` wheel for
     Linux and no `cp313` or `cp314` wheel, and a set that held `cp314-abi3`
     alone found no wheel and built the source distribution instead.
+
+    **`abis` is the third value that the target states.** Without it,
+    `cpython_tags` reads `Py_GIL_DISABLED` and `Py_DEBUG` from the interpreter
+    that runs it, and a free-threaded target planned by a GIL planner took
+    `cp313` wheels in place of `cp313t` ones. With `cp313t` given, `packaging`
+    also drops `abi3`, which a free-threaded build cannot load. No `abis`
+    means the plain build, `cpXY`, and never the planner's own.
     """
     major, minor = (int(part) for part in python_version.split("."))
     platforms = target_platforms(platform)
     return [
-        *cpython_tags(python_version=(major, minor), platforms=platforms),
+        *cpython_tags(python_version=(major, minor), abis=list(abis) or [f"cp{major}{minor}"], platforms=platforms),
         *compatible_tags(python_version=(major, minor), interpreter=f"cp{major}{minor}", platforms=platforms),
     ]
 
@@ -343,10 +350,16 @@ def target_from_environ() -> Target:
             "the interpreter that runs this planner, and a planner plans for another machine."
         )
 
+    if not document.get("abis"):
+        raise RuntimeError(
+            "PYDD_TARGET gives no `abis`. `packaging` would then read the ABI flags of the "
+            "interpreter that runs this planner, and a planner plans for another machine."
+        )
+
     python_version = document["pythonVersion"]
     platform = document["platform"]
     return Target(
-        tags=tuple(target_tags(python_version, platform)),
+        tags=tuple(target_tags(python_version, platform, document["abis"])),
         # `extra` is not a field of the environment. It is the name that a
         # marker of an optional dependency compares against, and an empty
         # value makes each such marker false, which is what an edge that the

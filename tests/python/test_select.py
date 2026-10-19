@@ -63,7 +63,7 @@ MARKERS = {
 }
 
 #: The document that `default.nix` puts in `PYDD_TARGET`, as JSON.
-TARGET_DOCUMENT = {"markers": MARKERS, "pythonVersion": PYTHON_VERSION, "platform": PLATFORM}
+TARGET_DOCUMENT = {"markers": MARKERS, "pythonVersion": PYTHON_VERSION, "platform": PLATFORM, "abis": ["cp313"]}
 
 #: One row of `PYDD_INPUTS`, as `uv.nix` writes it for a wheel to fetch.
 ROW = {
@@ -185,6 +185,18 @@ class TestTags:
         assert platforms[-1] == "linux_x86_64"
         assert "manylinux2014_x86_64" in platforms
         assert platforms.index("manylinux_2_28_x86_64") < platforms.index("manylinux_2_17_x86_64")
+
+    def test_a_free_threaded_target_takes_its_own_abi_and_not_abi3(self) -> None:
+        # The planner runs a GIL interpreter, so these tags come from the
+        # argument alone. `abi3` does not load into a free-threaded build.
+        accepted = set(target_tags(PYTHON_VERSION, PLATFORM, ["cp313t"]))
+        assert Tag("cp313", "cp313t", "manylinux_2_28_x86_64") in accepted
+        assert Tag("cp313", "cp313", "manylinux_2_28_x86_64") not in accepted
+        assert Tag("cp313", "abi3", "manylinux_2_28_x86_64") not in accepted
+        assert Tag("py3", "none", "any") in accepted
+
+    def test_no_abis_is_the_plain_build_and_not_the_planners(self) -> None:
+        assert target_tags(PYTHON_VERSION, PLATFORM) == target_tags(PYTHON_VERSION, PLATFORM, ["cp313"])
 
     @pytest.mark.parametrize("platform", ["macosx_11_0_arm64", "win_amd64", "any"])
     def test_a_platform_that_is_not_linux_travels_alone(self, platform: str) -> None:
@@ -318,6 +330,12 @@ class TestTheTargetComesFromTheNixHalf:
         markers = {name: value for name, value in MARKERS.items() if name != "sys_platform"}
         monkeypatch.setenv("PYDD_TARGET", json.dumps({**TARGET_DOCUMENT, "markers": markers}))
         with pytest.raises(RuntimeError, match="sys_platform"):
+            target_from_environ()
+
+    def test_a_document_without_abis_is_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        document = {key: value for key, value in TARGET_DOCUMENT.items() if key != "abis"}
+        monkeypatch.setenv("PYDD_TARGET", json.dumps(document))
+        with pytest.raises(RuntimeError, match="abis"):
             target_from_environ()
 
     def test_an_unset_variable_is_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
