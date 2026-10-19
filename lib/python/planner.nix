@@ -139,7 +139,7 @@
   # **The version is the one that nixpkgs holds, and not the one that the lock
   # file pins.** Nothing reconciles the two, and the planner prints both.
   fromNixpkgs ? { },
-  # **The escape hatch** (Lillecarl/pydd#6): a function per package name that
+  # **The escape hatch** (nixidae/nixidae#787): a function per package name that
   # makes the node of one artefact, as `{ numpy = artifact: drv; }`.
   #
   # `artifact` is `{ package, version, filename, kind, src }`, where `kind` is

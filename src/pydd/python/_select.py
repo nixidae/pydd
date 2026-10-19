@@ -108,7 +108,7 @@ class Artifact:
     planner_out: str = ""
     #: From pydd's lock of build systems, and not the project's.
     build_systems: bool = False
-    #: The node that a host function made for this artefact (Lillecarl/pydd#6).
+    #: The node that a host function made for this artefact (nixidae/nixidae#787).
     host_drv: str = ""
     host_out: str = ""
 

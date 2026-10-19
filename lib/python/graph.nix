@@ -155,7 +155,7 @@ let
         PKG_CONFIG_PATH = join ":" (root: "${root}/lib/pkgconfig");
       }
       # **A node that builds with tools also fixes the RUNPATH of what it
-      # built.** `scripts/fixup-elf.py` gives the reason (Lillecarl/pydd#4).
+      # built.** `scripts/fixup-elf.py` gives the reason (nixidae/nixidae#785).
       // (
         if node.overrides.fixup or true then
           {
@@ -167,7 +167,7 @@ let
           { }
       );
 
-  # **What one package needs beyond its tools, as data** (Lillecarl/pydd#5).
+  # **What one package needs beyond its tools, as data** (nixidae/nixidae#786).
   # `overrides.nix` reads it from the project and the caller, and the planner
   # attaches it to the node that builds that package. The build scripts read:
   #
@@ -426,7 +426,7 @@ let
       # nothing to correct.
       fetched node.artifact
     else if node.kind == "host" then
-      # **The escape hatch** (Lillecarl/pydd#6). A function of the host made
+      # **The escape hatch** (nixidae/nixidae#787). A function of the host made
       # this derivation for the artefact that the planner chose, so it is a
       # node of kind `nixpkgs` that a user wrote.
       fetched node.artifact

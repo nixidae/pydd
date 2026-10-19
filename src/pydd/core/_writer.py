@@ -53,7 +53,7 @@ class DrvWriter(CliWriter):
     """``pydd-drv add`` and ``pydd-drv submit``: the same calls, with no ``nix``.
 
     A planner then carries a binary over libstore instead of the closure of
-    the Nix CLI (Lillecarl/pydd#1).
+    the Nix CLI (nixidae/nixidae#782).
     """
 
     def __init__(self, tool: str = "pydd-drv") -> None:

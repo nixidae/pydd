@@ -1,4 +1,4 @@
-# The root of a planned build, as an ordinary derivation (Lillecarl/pydd#7).
+# The root of a planned build, as an ordinary derivation (nixidae/nixidae#788).
 #
 # **`builtins.outputOf` gives a bare string, and a string is not a package.**
 # It has no `meta`, no `override`, no `overrideAttrs` and no hook. Measured:
@@ -18,7 +18,7 @@
 # realises the installable and then reads the result, so it works.
 # `lib.getExe` gives a placeholder, which is correct inside another derivation.
 #
-# **The output floats too** (Lillecarl/pydd#14). The `.drv` names the planner,
+# **The output floats too** (nixidae/nixidae#795). The `.drv` names the planner,
 # and each mode has its own planner. An input-addressed root would get a path
 # for each mode around one environment. A floating root gets the path of
 # its links, so every mode that gives one environment gives one root.

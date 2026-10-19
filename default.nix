@@ -21,7 +21,7 @@ let
   huggormReleased = huggormSet.lanes.nix_2_35.huggorm;
 
   # Writes derivations from a build, as JSON, for a planner in any language
-  # (Lillecarl/pydd#1). One per Nix: only master has `builder-rpc-v0`.
+  # (nixidae/nixidae#782). One per Nix: only master has `builder-rpc-v0`.
   pydd-drv = pkgs.callPackage ./tools/pydd-drv { inherit (nix.libs) nix-store; };
   pydd-drv-released = pkgs.callPackage ./tools/pydd-drv { inherit (nixReleased.libs) nix-store; };
 

@@ -63,7 +63,7 @@ class Lane:
         """Build each target of `attribute`, from one evaluation, and give the paths in order."""
         # What the planner runs on may be built only on the host, such as a
         # huggorm lane, so copy it in rather than build it again. **The host's
-        # daemon is the slow path** (Lillecarl/pynixd#30: 9 s against 2 s for
+        # daemon is the slow path** (nixidae/nixidae#419: 9 s against 2 s for
         # one evaluation), so the chroot store answers first.
         store = ["--store", str(self.store)]
         closure = await self.nix_run(

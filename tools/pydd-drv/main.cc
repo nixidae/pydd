@@ -1,4 +1,4 @@
-// Write derivations from inside a build, as Nix's JSON (Lillecarl/pydd#1).
+// Write derivations from inside a build, as Nix's JSON (nixidae/nixidae#782).
 //
 //   pydd-drv add [--store URI]              one derivation on stdin; prints its path
 //   pydd-drv submit [--store URI] PATH OUT  PATH becomes output OUT of this build

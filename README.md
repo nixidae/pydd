@@ -233,7 +233,7 @@ names the store; the default is `~/.cache/pydd/store`.
 
 ## Layout
 
-Three layers, kept apart (Lillecarl/pydd#10). The core knows no
+Three layers, kept apart (nixidae/nixidae#791). The core knows no
 ecosystem. An ecosystem knows no mode. A mode is one way to turn a plan
 into a built root, and modes do not import each other.
 

@@ -1,5 +1,5 @@
 # What nixpkgs knows about building a crate, as tools and environment for
-# the nodes of that crate (Lillecarl/pydd#17).
+# the nodes of that crate (nixidae/nixidae#798).
 #
 # `defaultCrateOverrides` gives `buildRustCrate` the native inputs of a crate
 # that links a system library, such as `openssl-sys`. The hints read the same

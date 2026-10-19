@@ -79,7 +79,7 @@ gives the same file names.
 
 ## Projects and sources
 
-`project` is a package or the root of a workspace (Lillecarl/pydd#18).
+`project` is a package or the root of a workspace (nixidae/nixidae#799).
 A virtual workspace names no package, so the call passes `name`. Every
 other choice is cargo's own flag, and the planner passes it to the unit
 graph:
@@ -152,7 +152,7 @@ lists what each one needed. Two changes came from them:
 ## Native libraries
 
 A crate that links a system library, such as openssl-sys, needs that
-library and often `pkg-config` (Lillecarl/pydd#17). Three sources give
+library and often `pkg-config` (nixidae/nixidae#798). Three sources give
 the nodes of a crate its tools, and a later one wins for the crate it
 names:
 
@@ -208,7 +208,7 @@ pkg-config works in a shell, and fails in the sandbox with status 255.
 The hints take `__spliced.buildHost`.
 
 `tests/rust` builds three projects for aarch64, and runs each binary under
-`qemu-aarch64`. The rest is deferred, and Lillecarl/pydd#21 lists it:
+`qemu-aarch64`. The rest is deferred, and nixidae/nixidae#802 lists it:
 tests under cross, a declared tool's platform, and other targets.
 
 ## The modes
@@ -243,15 +243,15 @@ Python script and `rustc`, and keeps the output of a build script as JSON.
 
 cargo-dyndrv also runs outside a build: it writes the derivations through
 the user's daemon and prints the root. pydd has no such mode yet
-(Lillecarl/pydd#22).
+(nixidae/nixidae#803).
 
 ## What is missing
 
 | need | issue |
 | --- | --- |
-| fetch only the crates that the graph uses | Lillecarl/pydd#20 |
-| cross: tests, declared tools, other targets | Lillecarl/pydd#21 |
-| run the planner on the host, as cargo-dyndrv can | Lillecarl/pydd#22 |
+| fetch only the crates that the graph uses | nixidae/nixidae#801 |
+| cross: tests, declared tools, other targets | nixidae/nixidae#802 |
+| run the planner on the host, as cargo-dyndrv can | nixidae/nixidae#803 |
 
 **Every crate of the lock is fetched, also the ones that never build.**
 `importCargoLock` makes a fetch for each crate of `Cargo.lock`, so a Linux

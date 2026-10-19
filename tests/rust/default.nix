@@ -13,7 +13,7 @@ let
       '';
     };
     # openssl and zstd from nixpkgs, through pkg-config, with no declaration:
-    # `defaultCrateOverrides` gives both (Lillecarl/pydd#17). Its entry for
+    # `defaultCrateOverrides` gives both (nixidae/nixidae#798). Its entry for
     # zstd-sys sets ZSTD_SYS_USE_PKG_CONFIG, so the binary links the system
     # libzstd rather than the copy that zstd-sys bundles.
     native-app = {
@@ -64,7 +64,7 @@ let
     };
     # Cross-compiled for aarch64: proc-macros and build scripts run on this
     # machine, and the binary runs under qemu's user emulation
-    # (Lillecarl/pydd#21).
+    # (nixidae/nixidae#802).
     serde-app-aarch64 = {
       src = ./serde-app;
       arguments.targetPkgs = pkgs.pkgsCross.aarch64-multiplatform;

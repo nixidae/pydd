@@ -370,7 +370,7 @@ let
         }
       );
 
-  # **The result is an ordinary derivation** (Lillecarl/pydd#7), and
+  # **The result is an ordinary derivation** (nixidae/nixidae#788), and
   # `../core/root.nix` gives the shape. It takes `overrideAttrs` and every
   # install hook, and `pydd.python.uv` gives it `override` over the arguments
   # of this file. `passthru` holds the planner, and `dynamic` is the output

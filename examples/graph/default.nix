@@ -1,5 +1,5 @@
 # A planner with no Python and no pydd: a shell script that prints a graph as
-# JSON and pipes it to `pydd-drv graph` (Lillecarl/pydd#1). This is the shape
+# JSON and pipes it to `pydd-drv graph` (nixidae/nixidae#782). This is the shape
 # a planner in any language takes.
 #
 # On `builder-rpc-v0` the planner writes two nodes, and the root reads the

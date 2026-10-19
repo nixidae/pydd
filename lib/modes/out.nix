@@ -1,5 +1,5 @@
 # Released Nix: a planner writes one derivation, so the host makes the rest
-# (Lillecarl/pydd#2). `../python/planner.nix` calls this for a Python
+# (nixidae/nixidae#783). `../python/planner.nix` calls this for a Python
 # environment with `protocol = "out"`, and `pydd.modes.out` is the half that
 # runs in the planner.
 #

@@ -1,7 +1,7 @@
 # graph
 
 A planner with no Python and no pydd library. A shell script prints the
-graph as JSON, and `pydd-drv graph` writes it (Lillecarl/pydd#1).
+graph as JSON, and `pydd-drv graph` writes it (nixidae/nixidae#782).
 
 A node is Nix's derivation JSON. It names another node by its key in
 `inputs.drvs`, and reads its output as `{{key^out}}`. The tool writes

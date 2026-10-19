@@ -25,7 +25,7 @@ From the most restricted to the least:
 | --- | --- | --- | --- |
 | `$out` | any release | write one derivation, its root, as ATerm to `$out` | `out`, `out-stdenv` |
 | `builder-rpc-v0` | master | add derivations through a socket, and submit the root | `cli`, `huggorm`, `drv`, `stdenv` |
-| `builder-rpc-v0` with EnsurePath | master with Lillecarl/nix#371 | also `builtins.storePath` and `builtins.appendContext` | none built (pydd#8); `recursive-eval` shows what it allows |
+| `builder-rpc-v0` with EnsurePath | master with Lillecarl/nix#371 | also `builtins.storePath` and `builtins.appendContext` | none built (nixidae/nixidae#789); `recursive-eval` shows what it allows |
 | recursive-nix | any release, with `recursive-nix` | also `QueryPathInfo`, and building | `recursive`, `recursive-eval`, `recursive-nixpkgs` |
 
 **pydd uses recursive-nix as a `builder-rpc-v0` with more allowed, and
@@ -66,7 +66,7 @@ every other node before the planner runs.
   runs is Nix's. The planner writes in process, and it can evaluate Nix
   code: this mode evaluates `lib/python/graph.nix`.
 - **`drv` is `pydd-drv`**, a small C++ tool over libnixstore
-  (`tools/pydd-drv`, Lillecarl/pydd#1). It is the specialised CLI.
+  (`tools/pydd-drv`, nixidae/nixidae#782). It is the specialised CLI.
   `add` and `submit` do what the two `nix` commands do, and `graph`
   writes a whole graph of JSON derivations in one process.
 - **`out` writes through huggorm** today. huggorm stages each derivation
@@ -74,7 +74,7 @@ every other node before the planner runs.
   `$out`. `pydd-drv graph --out` does the same for a planner in any
   language (`examples/graph`). pydd's own planners cannot use it yet,
   because they add one derivation per call, and a new process does not
-  keep the in-memory store (Lillecarl/pydd#15).
+  keep the in-memory store (nixidae/nixidae#796).
 
 ### The nine modes
 
@@ -105,7 +105,7 @@ Lillecarl/nix#371.
 
 | | nixpkgs in the planner | stdenv as data | host builders |
 | --- | --- | --- | --- |
-| modes | `recursive-nixpkgs` | `stdenv`, `out-stdenv`, any other | any (`builders`, pydd#6) |
+| modes | `recursive-nixpkgs` | `stdenv`, `out-stdenv`, any other | any (`builders`, nixidae/nixidae#787) |
 | how | the planner imports nixpkgs and calls `stdenv.mkDerivation` | the host evaluates `stdenv.mkDerivation` once, and the planner lays a node's attributes over the result | the host calls a function per artefact, before planning |
 | needs | recursive-nix | nothing more | nothing more |
 | keeps | all of nixpkgs, at plan time | stdenv's phases and setup hooks | all of nixpkgs |
@@ -247,7 +247,7 @@ the string context from Python instead
 the planner has no such way.
 
 **No `builder-rpc-v0` mode can evaluate nixpkgs in a planner.** Measured in
-Lillecarl/pydd#9: a planner that imports nixpkgs fails after 33 s with
+nixidae/nixidae#790: a planner that imports nixpkgs fails after 33 s with
 `Operation 26 not allowed inside derivation`. Operation 26 is
 `QueryPathInfo`. `fetchToStore` calls it after it copies a path literal
 into the store, and nixpkgs has a path literal in every setup hook.
@@ -284,7 +284,7 @@ issue it names.
    request here: stdenv as data writes the same nodes with no nixpkgs in
    the planner, at every level.
 3. **Tools over the daemon protocol, and not a second protocol.**
-   `pydd-drv` (pydd#1) is the shape: `add` and `submit` are the two
+   `pydd-drv` (nixidae/nixidae#782) is the shape: `add` and `submit` are the two
    commands Nix has, and `graph` writes a whole graph in one process. It
    computes each placeholder and writes ATerm to `$out` on a release.
    Its closure is not much smaller than `nix`'s, because libnixstore is

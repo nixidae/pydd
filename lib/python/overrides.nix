@@ -1,4 +1,4 @@
-# Per-package node overrides, as data (Lillecarl/pydd#5).
+# Per-package node overrides, as data (nixidae/nixidae#786).
 #
 # A package that needs more than its lock file says gets it here, and the
 # planner writes it into the node that builds that package. So an override

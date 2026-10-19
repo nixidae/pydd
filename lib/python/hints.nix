@@ -1,5 +1,5 @@
 # What nixpkgs knows about building a Python package from source, as build
-# tools for the node that builds it (Lillecarl/pydd#3).
+# tools for the node that builds it (nixidae/nixidae#784).
 #
 # nixpkgs already packaged most Python distributions that hold C code, and its
 # package names the libraries and the programs that the build needs. A

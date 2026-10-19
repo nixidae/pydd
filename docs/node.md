@@ -76,7 +76,7 @@ dependencies, or keeps them all.
 
 **Yarn 2 and newer are refused.** Their `checksum` is the hash of Yarn's
 own zip of the package, not of the tarball. Nix cannot check a fetch
-against it. This is the problem of Go's `go.sum` (pydd#25).
+against it. This is the problem of Go's `go.sum` (nixidae/nixidae#806).
 
 **`out` reads npm's lock only.** In `out` the host makes every node, in
 Nix. Nix reads no YAML, and the host would need each reader a second

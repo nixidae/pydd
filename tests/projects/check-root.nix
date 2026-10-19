@@ -1,4 +1,4 @@
-# The root of an environment as an ordinary derivation (Lillecarl/pydd#7):
+# The root of an environment as an ordinary derivation (nixidae/nixidae#788):
 # `override` over the arguments of `uv.nix`, then `overrideAttrs` with an
 # install hook, then a run of Python from the tree that the root holds.
 {

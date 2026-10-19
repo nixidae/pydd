@@ -146,7 +146,7 @@ let
     };
   };
 in
-# An ordinary derivation, as `./uv.nix` gives it (Lillecarl/pydd#7).
+# An ordinary derivation, as `./uv.nix` gives it (nixidae/nixidae#788).
 let
   root = import ../core/root.nix {
     inherit pkgs;

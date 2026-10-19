@@ -57,7 +57,7 @@ let
       linksTo = "${pkgs.zeromq}";
     };
     # No hints, and no libsodium: the fixup finds it through the RUNPATH of
-    # libzmq (Lillecarl/pydd#4).
+    # libzmq (nixidae/nixidae#785).
     zmq-sdist-transitive = check ./check-binary.nix {
       project = ./zmq-sdist;
       venvName = "zmq-sdist-transitive";
@@ -71,14 +71,14 @@ let
       ];
     };
     # BLAS through PEP 517 config_settings, from a node override
-    # (Lillecarl/pydd#5). nixpkgs hints give the rest.
+    # (nixidae/nixidae#786). nixpkgs hints give the rest.
     numpy-sdist = check ./check-native.nix {
       project = ./numpy-sdist;
       venvName = "numpy-sdist";
       script = ./scripts/check-numpy.py;
     };
     # psutil from a stdenv build that the host wrote, the escape hatch
-    # (Lillecarl/pydd#6). The planner still selects the sdist, and cffi is
+    # (nixidae/nixidae#787). The planner still selects the sdist, and cffi is
     # still a planned node.
     native-host = check ./check-native.nix {
       project = ./native-app;

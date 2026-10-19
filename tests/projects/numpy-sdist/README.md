@@ -6,7 +6,7 @@ numpy, built from its sdist, with BLAS and LAPACK chosen through PEP 517
 The backend is meson-python, and the `build` group puts it and Cython in
 the lock. numpy carries its own meson.
 
-`pyproject.toml` declares one node override (Lillecarl/pydd#5):
+`pyproject.toml` declares one node override (nixidae/nixidae#786):
 
     [tool.pydd.overrides.numpy]
     config-settings = { setup-args = ["-Dblas=blas", "-Dlapack=lapack", ...] }

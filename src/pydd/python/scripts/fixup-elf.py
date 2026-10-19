@@ -1,7 +1,7 @@
 """Give each ELF file of a build output the RUNPATH that its DT_NEEDED entries need.
 
 `graph.nix` runs this at the end of a node that builds with build tools
-(Lillecarl/pydd#4). A build of C code links what its build tools offer, but
+(nixidae/nixidae#785). A build of C code links what its build tools offer, but
 how a backend calls the linker decides which directories reach the RUNPATH.
 pyzmq links `libsodium.so.26` through the link interface of zeromq, and its
 RUNPATH then names zeromq and not libsodium.
