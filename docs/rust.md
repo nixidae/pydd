@@ -111,6 +111,13 @@ file.
 The root joins the binaries of every root unit. A workspace's libraries
 build too, as with `cargo build`, and install nothing.
 
+**A GUI program gets its runtime environment from the root.** The root
+runs fixup, without the steps that rewrite a file in place. So
+`overrideAttrs` with `wrapGAppsHook3` in `nativeBuildInputs`, and
+glib-networking and gsettings-desktop-schemas in `buildInputs`, wraps each
+binary as a nixpkgs build does. `wrapProgram` in `postFixup` works too.
+croshome's kubecove (Tauri, webkit2gtk) does both.
+
 ## Tests
 
 `root.tests` runs every test of the project, as `cargo test` does. It is

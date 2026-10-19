@@ -50,9 +50,14 @@ pkgs.stdenvNoCC.mkDerivation {
   dontUnpack = true;
   dontConfigure = true;
   dontBuild = true;
-  # stdenv's fixup strips, patches and compresses files in place, and every
-  # file here is a link into another store path.
-  dontFixup = true;
+  # Fixup runs, so that `wrapGAppsHook3` and a `wrapProgram` in `postFixup`
+  # wrap the programs (nixidae/nixidae#745). Each step that rewrites a file in
+  # place is off: every file here is a link into another, read-only, store path.
+  dontStrip = true;
+  dontPatchELF = true;
+  dontPatchShebangs = true;
+  dontGzipMan = true;
+  dontPruneLibtoolFiles = true;
   installPhase = ''
     runHook preInstall
     ${pkgs.lib.optionalString (program != null) ''

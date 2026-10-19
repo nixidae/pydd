@@ -93,8 +93,10 @@ archive, chooses the backend from the same lock, and submits the build.
 links into the environment, or into the application when the call names
 one. Its output floats (#14), so every mode that gives one environment
 gives one root. It takes `override` over the arguments of `uv`, `overrideAttrs` and
-the install hooks, and it works in `environment.systemPackages` and
-`buildInputs`. Its `passthru` holds `planner`, `dynamic` (the output that
+the install and fixup hooks, and it works in `environment.systemPackages` and
+`buildInputs`. Fixup runs without strip, patchelf or `patchShebangs`, so
+`wrapGAppsHook3` and `wrapProgram` wrap a program and change no file of
+the environment (nixidae/nixidae#745). Its `passthru` holds `planner`, `dynamic` (the output that
 the planner submits), `env`, `app` and `shell`. The reader handles
 workspaces, git, URL and path sources, and local registries.
 `tests/projects` builds one project for each (see Tests). uv locks neither
