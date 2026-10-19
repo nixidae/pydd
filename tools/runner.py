@@ -26,6 +26,7 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE, CalledProcessError
@@ -219,11 +220,33 @@ async def attribute_names(attribute: str) -> list[str]:
     return json.loads(result.stdout)
 
 
+async def collect(lanes: Iterable[Lane], cache: Path) -> None:
+    """Empty each chroot store before a run.
+
+    **Nothing roots a path there, so emptying it is all a collection does.**
+    Every edit gives new planners and new nodes, and a store that no run
+    collected grew past 90 GB and filled the disk. `nix store gc` deletes one
+    path per database write, and took over 20 minutes for 63k paths, so a
+    store under `cache` goes whole, database and WAL included. A store that
+    `PYDD_STORE` names elsewhere is the caller's, and gets `nix store gc`.
+    """
+    for lane in {lane.store: lane for lane in lanes}.values():
+        if not lane.store.exists():
+            continue
+        if lane.store.is_relative_to(cache):
+            await anyio.run_process(["chmod", "-R", "u+w", str(lane.store)])
+            await anyio.run_process(["rm", "-rf", str(lane.store)])
+        else:
+            await lane.nix_run(["store", "gc", "--store", str(lane.store)], 3600, sys.stderr)
+
+
 async def test(arguments: argparse.Namespace) -> int:
     cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
     log = arguments.log or cache / "pydd" / arguments.set
     log.mkdir(parents=True, exist_ok=True)
     modes = {mode for group in GROUPS[arguments.set].values() for mode in group}
+    if not arguments.keep_store:
+        await collect((lanes()[MODES[mode]] for mode in modes), cache / "pydd")
     test_set = TestSet(
         arguments.set,
         log,
@@ -283,6 +306,7 @@ def parser() -> argparse.ArgumentParser:
     many.add_argument("projects", nargs="*", help="only these projects")
     many.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2), help="projects at a time")
     many.add_argument("--log", type=Path, help="directory of the logs")
+    many.add_argument("--keep-store", action="store_true", help="do not collect the chroot stores before the run")
     return top
 
 
