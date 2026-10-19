@@ -95,6 +95,20 @@ def test_a_build_script_runs_for_the_platform_of_its_unit() -> None:
     assert specs["serde-1.0.229-build-script-run"]["env"]["HOST"] == HOST
 
 
+def test_a_build_script_reads_the_links_of_its_package() -> None:
+    writer = KeepingWriter()
+    planner = Planner(writer, "x86_64-linux", None)
+    graph = json.loads((FIXTURES / "serde-app.unit-graph.json").read_text())
+    metadata = json.loads((FIXTURES / "serde-app.metadata.json").read_text())
+    for package in metadata["packages"]:
+        if package["name"] == "serde":
+            package["links"] = "serde_core"
+    planner.submit(Graph(planner, menu(), graph, metadata).root())
+    specs = {drv.name: json.loads(drv.env["PYDD_UNIT"]) for drv in writer.added}
+    assert specs["serde-1.0.229-build-script-run"]["env"]["CARGO_MANIFEST_LINKS"] == "serde_core"
+    assert "CARGO_MANIFEST_LINKS" not in specs["proc-macro2-1.0.107-build-script-run"]["env"]
+
+
 def test_a_proc_macro_links_dynamically() -> None:
     _, specs = plan()
     flags = specs["serde_derive-1.0.229"]["flags"]

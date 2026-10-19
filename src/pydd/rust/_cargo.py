@@ -478,6 +478,9 @@ class Graph:
             "CARGO_CFG_FEATURE": ",".join(unit["features"]),
             **{f"CARGO_FEATURE_{feature.upper().replace('-', '_')}": "1" for feature in unit["features"]},
         }
+        # ring's build script checks it against its own version.
+        if package.get("links"):
+            env["CARGO_MANIFEST_LINKS"] = package["links"]
         return {
             "action": "run",
             "program": f"{self.nodes[program].output()}/bin/build-script-build",
