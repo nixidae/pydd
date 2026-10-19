@@ -67,6 +67,9 @@ class Menu:
     #: More packages whose install scripts run. pnpm and bun run only those
     #: that the project allows, and Yarn v1 records none.
     install_scripts: list[str] = field(default_factory=list[str])
+    #: The workspace members to install, by path, as `pnpm --filter <member>...`
+    #: takes them. `None`: every member.
+    members: list[str] | None = None
 
     @property
     def directory(self) -> str:
@@ -258,6 +261,29 @@ class Lock:
             for other, entry in self.packages.items()
             if other.startswith(prefix) and not entry.get("inBundle") and not entry.get("link")
         )
+
+    def only(self, members: list[str]) -> None:
+        """Keep the project, `members`, each member they link to, and every package these reach.
+
+        Placement stays as the whole lock gave it, so each `require` of a kept
+        package resolves as before.
+        """
+        unknown = [member for member in members if member not in self.packages or "node_modules/" in member]
+        if unknown:
+            raise SystemExit(f"pydd.node.npm: the lock holds no workspace member {', '.join(unknown)}.")
+        kept: set[str] = set()
+        stack = ["", *members]
+        while stack:
+            path = stack.pop()
+            if path in kept:
+                continue
+            kept.add(path)
+            stack += self.dependencies(path)
+        self.packages = {
+            path: entry
+            for path, entry in self.packages.items()
+            if path in kept or (entry.get("link") and entry["resolved"] in kept)
+        }
 
     def is_package(self, path: str) -> bool:
         """An entry that npm fetches, rather than a link, a workspace member or a bundled package."""
@@ -537,7 +563,9 @@ def main() -> int:
             if path and name_of(path, entry) in menu.install_scripts:
                 entry["hasInstallScript"] = True
     else:
-        packages = _readers.read(menu.directory, menu.lockfile, menu.install_scripts)
+        packages = _readers.read(menu.directory, menu.lockfile, menu.install_scripts, menu.members)
         lock = Lock(packages, planner.system, menu.libc, menu.omit)
+    if menu.members is not None:
+        lock.only(menu.members)
     planner.submit(Graph(planner, menu, lock).root(menu.scripts))
     return 0

@@ -118,6 +118,23 @@ class Graph:
             return "link:" + ("" if path == "." else path)
         return self.key(name, ref)
 
+    def only(self, members: Iterable[str]) -> None:
+        """Keep the project, `members` and each member they link to, before placement."""
+        kept: set[str] = set()
+        stack = ["", *members]
+        while stack:
+            importer = stack.pop()
+            if importer in kept:
+                continue
+            if importer not in self.importers:
+                raise SystemExit(f"pydd.node.npm: the lock holds no workspace member {importer}.")
+            kept.add(importer)
+            for refs in self.importers[importer].values():
+                for name, ref in refs.items():
+                    if (target := self.target(importer, name, ref)).startswith("link:"):
+                        stack.append(target.removeprefix("link:"))
+        self.importers = {path: kinds for path, kinds in self.importers.items() if path in kept}
+
 
 def lookup(layout: dict[str, str], path: str, name: str) -> str | None:
     """The path that Node finds `name` at from `path`, in a partial layout."""
@@ -449,10 +466,13 @@ def read_yarn(directory: str, text: str) -> Graph:
     return Graph(versions, importers, key)
 
 
-def read(directory: str, lock: str, scripts: Iterable[str] = ()) -> dict[str, dict[str, Any]]:
+def read(
+    directory: str, lock: str, scripts: Iterable[str] = (), members: Iterable[str] | None = None
+) -> dict[str, dict[str, Any]]:
     """The `packages` of an npm lock, from a lock of another tool in `directory`.
 
-    `scripts` names more packages whose install scripts run.
+    `scripts` names more packages whose install scripts run. A graph lock
+    places only `members`, their linked members and the project, when given.
     """
     text = Path(directory, lock).read_text(encoding="utf-8")
     match lock:
@@ -460,6 +480,8 @@ def read(directory: str, lock: str, scripts: Iterable[str] = ()) -> dict[str, di
             import yaml
 
             graph, built = read_pnpm(directory, yaml.safe_load(text))
+            if members is not None:
+                graph.only(members)
             packages = hoist(graph, directory, built | set(scripts))
         case "bun.lock":
             packages, _ = read_bun(directory, text)
@@ -467,7 +489,10 @@ def read(directory: str, lock: str, scripts: Iterable[str] = ()) -> dict[str, di
                 if entry.get("name") in set(scripts):
                     entry["hasInstallScript"] = True
         case "yarn.lock":
-            packages = hoist(read_yarn(directory, text), directory, set(scripts))
+            graph = read_yarn(directory, text)
+            if members is not None:
+                graph.only(members)
+            packages = hoist(graph, directory, set(scripts))
         case _:
             raise SystemExit(f"pydd.node.npm: pydd reads no lock named {lock}.")
     mark(packages)

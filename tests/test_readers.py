@@ -131,3 +131,18 @@ def test_pnpm_patch_without_its_file_is_refused(tmp_path: Path) -> None:
 def test_pnpm_file_ref_with_peers_is_no_alias() -> None:
     ref = "file:modules/text(react@19.3.0)"
     assert pnpm_key("text", ref) == f"text@{ref}"
+
+
+def test_members_keep_the_members_they_link_to() -> None:
+    project = str(PROJECTS / "pnpm-workspace")
+    app = read(project, "pnpm-lock.yaml", members=["packages/app"])
+    assert {"packages/app", "packages/greet", "node_modules/ms"} <= set(app)
+    greet = read(project, "pnpm-lock.yaml", members=["packages/greet"])
+    assert "packages/app" not in greet
+    assert "node_modules/workspace-app" not in greet
+    assert "node_modules/ms" in greet
+
+
+def test_an_unknown_member_is_refused() -> None:
+    with pytest.raises(SystemExit, match="no workspace member apps/nope"):
+        read(str(PROJECTS / "pnpm-workspace"), "pnpm-lock.yaml", members=["apps/nope"])

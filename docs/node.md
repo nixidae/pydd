@@ -192,6 +192,12 @@ The root then removes what `omit` leaves out, and the directories that
 this leaves empty. It links each program of the project and of its
 workspace members into `bin`.
 
+**`members` installs part of a workspace**, as `pnpm --filter
+<member>...` does: `members = [ "apps/server" ]` keeps the project, that
+member, each member it links to, and the packages these reach. Every
+other member and its packages are left out of the build and the result.
+With a pnpm or Yarn lock the reader places only what it keeps.
+
 A program's `#!/usr/bin/env node` becomes the path of Node, as stdenv's
 `patchShebangs` does. The packages' programs get the same.
 

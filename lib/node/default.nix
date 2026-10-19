@@ -69,11 +69,19 @@ let
       # `onlyBuiltDependencies`, `trustedDependencies`), and Yarn v1's lock
       # records no scripts.
       installScripts ? [ ],
+      # The workspace members to install and build, by path, as
+      # `[ "apps/server" ]`: each one, every member it links to, and the
+      # project, as `pnpm --filter <member>...` takes them. `null`: all.
+      members ? null,
     }:
     assert lib.assertMsg (lockfile != null) (
       "pydd.node.npm: ${toString project} holds no package-lock.json, pnpm-lock.yaml, bun.lock "
       + "or yarn.lock. The planner builds what the lock pins. Run `npm install --package-lock-only` "
       + "there, and commit the file."
+    );
+    assert lib.assertMsg (members == null || pydd.protocol != "out") (
+      "pydd.node.npm: `members` filters the lock in the planner, and in out mode the host "
+      + "makes every node. Use a mode with a planner socket."
     );
     let
       # `"pydd"` of `package.json`:
@@ -172,7 +180,9 @@ let
         hashes = outputHashes;
         inherit lockfile;
         install_scripts = declared.installScripts or [ ] ++ installScripts;
-      };
+      }
+      # Only when set, so the menu of every other project keeps its hash.
+      // lib.optionalAttrs (members != null) { inherit members; };
       # On released Nix the host makes each node, and the planner writes only
       # the root (`./graph.nix`). Each node's `.drv` is an input of the
       # planner, and nothing builds it until the root names it.
