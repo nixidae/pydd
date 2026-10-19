@@ -23,7 +23,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-from pathlib import Path
 
 from packaging.utils import canonicalize_name
 
@@ -42,7 +41,7 @@ from pydd.python import (
     target_from_environ,
 )
 from pydd.python import _build_systems as build_systems
-from pydd.python._hook import requires_for_build
+from pydd.python._hook import requires_for_build, sites_of
 from pydd.python._poetrylock import PoetryProject
 
 
@@ -123,15 +122,14 @@ def main() -> int:
     if os.environ.get("PYDD_ROLE") == "backend":
         root = plan.backend_node(f"{sdist.node_name}-backend", backend_path=backend_path)
     else:
-        sites = Path(env("PYDD_BACKEND")).read_text().strip()
         override = plan.overrides.get(canonicalize_name(sdist.package), {})
         extra = requires_for_build(
             hook="wheel",
             python=env("PYDD_PYTHON"),
-            archive=archive,
+            source=archive,
             subdirectory=subdirectory,
             backend=backend,
-            sites=[site for site in sites.split(":") if site],
+            sites=sites_of(env("PYDD_BACKEND")),
             config_settings=override.get("configSettings"),
             path=os.environ.get("PYDD_HOOK_PATH", ""),
             env=override.get("env"),

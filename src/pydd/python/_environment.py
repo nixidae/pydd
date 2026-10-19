@@ -38,6 +38,7 @@ packages of that selection become roots. `lib/python/uv.nix` and
 from __future__ import annotations
 
 import json
+import os
 import sys
 import tomllib
 from dataclasses import dataclass, field
@@ -69,6 +70,7 @@ from pydd.python import (
     target_from_environ,
 )
 from pydd.python import _build_systems as build_systems
+from pydd.python._hook import requires_for_build, sites_of
 from pydd.python._poetrylock import PoetryProject
 from pydd.python._workspace import members as members_of
 from pydd.python._workspace import selection
@@ -353,9 +355,46 @@ def select_backend(
         dependency = choose(request.artifacts, requirement, target, request.no_binary)
         if dependency is None:
             raise RuntimeError(f"{subject}: no artefact of the lock file satisfies '{requirement}'")
-        names.append(plan.artifact_node(dependency, dependency.kind))
+        name = plan.artifact_node(dependency, dependency.kind)
+        if name not in names:
+            names.append(name)
         print(f"plan:   backend {dependency.filename} for {requirement}", file=sys.stderr)
     return names
+
+
+#: The `get_requires_for_build_*` hook that each form of a local project asks.
+#: `from-sdist` asks `wheel` of the tree: its archive is the output of another
+#: planner, which this planner cannot read.
+HOOK_OF = {"editable": "editable", "wheel": "wheel", "sdist": "sdist", "from-sdist": "wheel"}
+
+
+def requires_asked(key: str, projects: list[LocalProject], request: Request, target: Target) -> list[Requirement]:
+    """What the backend of the local project `key` asks for, through its hook.
+
+    The `build` role of a local planner runs this, with the backend that its
+    `backend` role built (nixidae/nixidae#847).
+    """
+    name, _, form = key.partition(":")
+    project = next(project for project in projects if project.name == name)
+    backend, _ = build_system(project.pyproject)
+    override = request.overrides.get(canonicalize_name(name), {})
+    asked = requires_for_build(
+        hook=HOOK_OF[form],
+        python=env("PYDD_PYTHON"),
+        source=project.source,
+        subdirectory=project.subdirectory,
+        backend=backend,
+        sites=sites_of(env("PYDD_BACKEND")),
+        config_settings=override.get("configSettings"),
+        path=os.environ.get("PYDD_HOOK_PATH", ""),
+        env=override.get("env"),
+    )
+    asked = [
+        requirement for requirement in asked if target.accepts(str(requirement.marker) if requirement.marker else None)
+    ]
+    if asked:
+        print(f"plan: {key}: {backend} asks for {[str(requirement) for requirement in asked]}", file=sys.stderr)
+    return asked
 
 
 def make_plan(
@@ -363,8 +402,13 @@ def make_plan(
     projects: list[LocalProject],
     target: Target,
     reader: UvProject | PoetryProject | None = None,
+    asked: dict[str, list[Requirement]] | None = None,
 ) -> Plan:
-    """Turn the lock file into the graph that builds the environment."""
+    """Turn the lock file into the graph that builds the environment.
+
+    `asked` holds what a backend's `get_requires_for_build_*` hook asked for,
+    by local project.
+    """
     plan = Plan(build_tools=request.build_tools, overrides=request.overrides)
     artifacts = request.artifacts
 
@@ -430,18 +474,14 @@ def make_plan(
         # and selects it from the same lock file.
         subject = f"{project.name} ({project.mode})"
         backend, requirements = build_system(project.pyproject)
+        requirements += (asked or {}).get(project.name, [])
         plan.pretend_version(project.name, project.version or "0.0.0", requirements)
         # **A backend needs its own dependencies, and `requires` names only the
         # top of that closure.** `uv.lock` and `poetry.lock` hold the edges of
         # every package they list, so the lock file expands the list when there
         # is one.
         requirements = build_systems.backend(reader, requirements, target, subject, request.build_systems)
-        # **One path serves both hooks, and PEP 517 says that it may.** The
-        # `requires` of the project is the environment that a backend builds
-        # in, whichever hook the frontend calls. What this lab does not do is
-        # call `get_requires_for_build_sdist` afterwards, and
-        # `scripts/build-local.py` gives the reason.
-        backend_path = select_backend(plan, request, requirements, target, subject)
+        backend_path = plan.local_backends[project.name] = select_backend(plan, request, requirements, target, subject)
 
         # **The three forms differ in one PEP 517 hook, and in nothing else.**
         # The same tree, the same backend and the same path serve all three, so
@@ -520,9 +560,22 @@ def main() -> int:
 
     request = Request.from_json(inputs, roots)
 
-    plan = make_plan(request, projects, target, reader)
+    # **A local project takes two planners, as a source distribution does.**
+    # `backend` submits the backend's environment. `build` takes it built,
+    # asks the backend's hook, and plans with the answer on the path.
+    role = os.environ.get("PYDD_ROLE")
+    only = os.environ.get("PYDD_ONLY")
+    asked: dict[str, list[Requirement]] = {}
+    if role == "build" and only is not None:
+        asked[only.partition(":")[0]] = requires_asked(only, projects, request, target)
+
+    plan = make_plan(request, projects, target, reader, asked)
     application: str | None = inputs.get("application")
-    root = choose_root(plan, inputs, env("PYDD_VENV_NAME"), application)
+    if role == "backend" and only is not None:
+        name = only.partition(":")[0]
+        root = plan.backend_node(f"{name}-backend", backend_path=plan.local_backends[name])
+    else:
+        root = choose_root(plan, inputs, env("PYDD_VENV_NAME"), application)
     if application is not None:
         print(f"plan: application {application}, over the environment of the same members", file=sys.stderr)
 

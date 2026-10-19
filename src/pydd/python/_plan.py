@@ -152,6 +152,9 @@ class Plan:
     #: The node of each local project, by `<project>:<form>`, where the form is
     #: `editable`, `wheel`, `sdist` or `from-sdist`.
     local_nodes: dict[str, str] = field(default_factory=dict[str, str])
+    #: The backend path of each local project, by name, for the root of its
+    #: `backend` planner.
+    local_backends: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
     #: The store paths that each package needs to build, by PEP 503 name.
     #: `build_tools_from` reads the value out of the inputs of the planner.
     build_tools: dict[str, list[dict[str, str]]] = field(default_factory=dict[str, list[dict[str, str]]])

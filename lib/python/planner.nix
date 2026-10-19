@@ -661,22 +661,28 @@ let
     let
       backend = sdistPlannerAs depth entry "backend" "${entry.package}-${entry.version}-backend" { };
     in
-    (sdistPlannerAs depth entry "build" "${entry.package}-${entry.version}" {
-      PYDD_BACKEND = backend.out;
-      # The interpreter of the target runs the hook, as it runs the build.
-      PYDD_PYTHON = "${python}/bin/${python.executable}";
-      # **The hook sees the tools that the build sees.** mesonpy asks for
-      # `ninja` and `patchelf`, and scikit-build-core for `cmake` and `ninja`,
-      # only when `PATH` lacks the program, and no lock holds those wheels.
-      PYDD_HOOK_PATH = builtins.concatStringsSep ":" (
-        map (tool: "${tool}/bin") (
-          let
-            roots = buildTools.${entry.package} or [ ];
-          in
-          roots ++ pkgs.lib.optional (roots != [ ]) pkgs.patchelf
-        )
-      );
-    }).planner;
+    (sdistPlannerAs depth entry "build" "${entry.package}-${entry.version}" (
+      hookEnv entry.package backend
+    )).planner;
+
+  # What the `build` role of a planner needs to ask the backend that its
+  # `backend` role submitted.
+  hookEnv = package: backend: {
+    PYDD_BACKEND = backend.out;
+    # The interpreter of the target runs the hook, as it runs the build.
+    PYDD_PYTHON = "${python}/bin/${python.executable}";
+    # **The hook sees the tools that the build sees.** mesonpy asks for
+    # `ninja` and `patchelf`, and scikit-build-core for `cmake` and `ninja`,
+    # only when `PATH` lacks the program, and no lock holds those wheels.
+    PYDD_HOOK_PATH = builtins.concatStringsSep ":" (
+      map (tool: "${tool}/bin") (
+        let
+          roots = buildTools.${package} or [ ];
+        in
+        roots ++ pkgs.lib.optional (roots != [ ]) pkgs.patchelf
+      )
+    );
+  };
 
   sdistPlannerAs =
     depth: entry: role: name: roleEnv:
@@ -684,41 +690,44 @@ let
       # Nix requires the planner to carry the name of what it submits.
       inherit name;
       main = "_sdist_planner";
-      env = plannerEnv // roleEnv // {
-        PYDD_ROLE = role;
+      env =
+        plannerEnv
+        // roleEnv
+        // {
+          PYDD_ROLE = role;
 
-        # **The archive is a real dependency of this derivation.** That is the
-        # whole point: this planner reads a file that no evaluation can read,
-        # and Nix downloads it before the planner runs.
-        #
-        # An archive of a `path` source needs no download, and the string that
-        # `uv.nix` wrote already carries the context of the file. Nix makes
-        # that file an input source of this planner in the same way.
-        PYDD_SDIST = if entry ? path then entry.path else entry.drv;
+          # **The archive is a real dependency of this derivation.** That is the
+          # whole point: this planner reads a file that no evaluation can read,
+          # and Nix downloads it before the planner runs.
+          #
+          # An archive of a `path` source needs no download, and the string that
+          # `uv.nix` wrote already carries the context of the file. Nix makes
+          # that file an input source of this planner in the same way.
+          PYDD_SDIST = if entry ? path then entry.path else entry.drv;
 
-        # **The menu is the same for every planner of one level, so it is
-        # serialised once for that level and not once for each planner.**
-        # `levelJson` is a list, and a list is a memo, so `builtins.toJSON`
-        # runs one time for each level. It ran one time for each planner while
-        # the row below was part of this document, and the lock file of the
-        # benchmark then paid 27.9 MB of JSON for each level.
-        # `docs/PACKAGING-FACTS.md` holds both measurements.
-        PYDD_INPUTS = builtins.elemAt levelJson (depth - 1);
+          # **The menu is the same for every planner of one level, so it is
+          # serialised once for that level and not once for each planner.**
+          # `levelJson` is a list, and a list is a memo, so `builtins.toJSON`
+          # runs one time for each level. It ran one time for each planner while
+          # the row below was part of this document, and the lock file of the
+          # benchmark then paid 27.9 MB of JSON for each level.
+          # `docs/PACKAGING-FACTS.md` holds both measurements.
+          PYDD_INPUTS = builtins.elemAt levelJson (depth - 1);
 
-        # **A URL source names where its project lives inside the archive.**
-        # `uv.nix` puts `subdirectory` on the artefact, and the planner of this
-        # distribution reads the declaration there. An artefact of the index
-        # carries no such key.
-        #
-        # This is the one part that differs between two planners of one level,
-        # and it is a few hundred bytes.
-        PYDD_SDIST_ROW = builtins.toJSON (
-          {
-            inherit (entry) package version filename;
-          }
-          // pkgs.lib.optionalAttrs (entry ? subdirectory) { inherit (entry) subdirectory; }
-        );
-      };
+          # **A URL source names where its project lives inside the archive.**
+          # `uv.nix` puts `subdirectory` on the artefact, and the planner of this
+          # distribution reads the declaration there. An artefact of the index
+          # carries no such key.
+          #
+          # This is the one part that differs between two planners of one level,
+          # and it is a few hundred bytes.
+          PYDD_SDIST_ROW = builtins.toJSON (
+            {
+              inherit (entry) package version filename;
+            }
+            // pkgs.lib.optionalAttrs (entry ? subdirectory) { inherit (entry) subdirectory; }
+          );
+        };
     };
 
   # **The levels are a list, and not a recursive function, because a list is a
@@ -781,6 +790,10 @@ let
   # one project, `PYDD_ONLY`. A project built from its own sdist takes two:
   # the archive, and the wheel out of it, which names the first.
   #
+  # **Each takes a `backend` planner too, as a source distribution does**, so
+  # the `build` role can ask the backend's `get_requires_for_build_*`. One
+  # `backend` planner serves every form of a project: the forms share a path.
+  #
   # A planner of a local project gets no planner of another local project: two
   # members that need each other would make two planners that need each other.
   #
@@ -792,36 +805,44 @@ let
     sdist = "sdist";
     from-sdist = "from-sdist";
   };
-  localPlanner =
-    project: form: planned:
-    (mkPythonPlanner {
+  localPlannerAs =
+    project: form: role: name: planned: roleEnv:
+    mkPythonPlanner {
       # Nix requires a planner to carry the name of what it submits.
-      name = "${project}-${localSuffix.${form}}";
+      inherit name;
       main = "_environment";
-      env = plannerEnv // {
-        PYDD_INPUTS = builtins.elemAt levelJson sdistPlannerDepth;
-        PYDD_PLANNED = builtins.toJSON planned;
-        PYDD_VENV_NAME = venvName;
-        PYDD_ONLY = "${project}:${form}";
-      };
-    }).planner;
+      env =
+        plannerEnv
+        // roleEnv
+        // {
+          PYDD_ROLE = role;
+          PYDD_INPUTS = builtins.elemAt levelJson sdistPlannerDepth;
+          PYDD_PLANNED = builtins.toJSON planned;
+          PYDD_VENV_NAME = venvName;
+          PYDD_ONLY = "${project}:${form}";
+        };
+    };
   localPlanned = pkgs.lib.concatMapAttrs (
     project: spec:
     let
       form = spec.mode or "editable";
+      backend = localPlannerAs project form "backend" "${project}-backend" { } { };
+      build =
+        form: planned:
+        plannerRow
+          (localPlannerAs project form "build" "${project}-${localSuffix.${form}}" planned (
+            hookEnv project backend
+          )).planner;
     in
     if form == "sdist" then
       let
         archive = {
-          "${project}:sdist" = plannerRow (localPlanner project "sdist" { });
+          "${project}:sdist" = build "sdist" { };
         };
       in
-      archive
-      // {
-        "${project}:from-sdist" = plannerRow (localPlanner project "from-sdist" archive);
-      }
+      archive // { "${project}:from-sdist" = build "from-sdist" archive; }
     else
-      { "${project}:${form}" = plannerRow (localPlanner project form { }); }
+      { "${project}:${form}" = build form { }; }
   ) (editables // uvEditables);
 
   inputs = menu // mode.inputs;

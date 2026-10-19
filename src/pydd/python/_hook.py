@@ -9,6 +9,7 @@ does, in the unpacked project, with the backend's sites on `PYTHONPATH`.
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -55,11 +56,31 @@ def unpack(archive: str, into: Path) -> Path:
     return tops[0]
 
 
+def sites_of(manifest: str) -> list[str]:
+    """The sites that the root of a `backend` planner names, in order."""
+    return [site for site in Path(manifest).read_text().strip().split(":") if site]
+
+
+def writable(source: str, into: Path) -> Path:
+    """The project of `source`: a source distribution unpacked, or a tree copied.
+
+    The copy has to be writable: setuptools' hook runs `egg_info`, which
+    writes into the project, and a tree in the store is read only.
+    """
+    if not Path(source).is_dir():
+        return unpack(source, into)
+    tree = into / "tree"
+    shutil.copytree(source, tree)
+    for path in [tree, *tree.rglob("*")]:
+        path.chmod(path.stat().st_mode | 0o200)
+    return tree
+
+
 def requires_for_build(
     *,
     hook: str,
     python: str,
-    archive: str,
+    source: str,
     subdirectory: str,
     backend: str,
     sites: list[str],
@@ -67,13 +88,15 @@ def requires_for_build(
     path: str = "",
     env: dict[str, str] | None = None,
 ) -> list[Requirement]:
-    """What `get_requires_for_build_<hook>` of `backend` returns for this archive.
+    """What `get_requires_for_build_<hook>` of `backend` returns for `source`.
+
+    `source` is a source distribution, or the tree of a local project.
 
     A backend that defines no such hook needs nothing more, which PEP 517 says
     is the same as an empty list.
     """
     with tempfile.TemporaryDirectory() as scratch:
-        project = unpack(archive, Path(scratch) / "src") / subdirectory
+        project = writable(source, Path(scratch) / "src") / subdirectory
         result = subprocess.run(
             [python, "-c", HOOK, hook, backend, config_settings or "null"],
             cwd=project,
@@ -83,5 +106,5 @@ def requires_for_build(
             check=False,
         )
     if result.returncode != 0:
-        raise RuntimeError(f"{Path(archive).name}: get_requires_for_build_{hook} of {backend} failed\n{result.stderr}")
+        raise RuntimeError(f"{Path(source).name}: get_requires_for_build_{hook} of {backend} failed\n{result.stderr}")
     return [Requirement(text) for text in json.loads(result.stdout.splitlines()[-1])]
