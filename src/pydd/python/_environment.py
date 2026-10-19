@@ -51,7 +51,6 @@ from pydd.core import writer_from_environ
 from pydd.modes import root as choose_root
 from pydd.modes import submit
 from pydd.python import (
-    EDITABLE_REQUIRES,
     Artifact,
     LocalNode,
     Lock,
@@ -431,8 +430,6 @@ def make_plan(
         # and selects it from the same lock file.
         subject = f"{project.name} ({project.mode})"
         backend, requirements = build_system(project.pyproject)
-        if project.mode == "editable":
-            requirements += [Requirement(text) for text in EDITABLE_REQUIRES.get(backend, ())]
         plan.pretend_version(project.name, project.version or "0.0.0", requirements)
         # **A backend needs its own dependencies, and `requires` names only the
         # top of that closure.** `uv.lock` and `poetry.lock` hold the edges of

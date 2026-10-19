@@ -51,9 +51,6 @@ from ._sdist import (
     read_pyproject as read_pyproject,
 )
 from ._select import (
-    EDITABLE_REQUIRES as EDITABLE_REQUIRES,
-)
-from ._select import (
     FALLBACK_BACKEND as FALLBACK_BACKEND,
 )
 from ._select import (
@@ -112,7 +109,6 @@ from ._uvlock import (
 )
 
 __all__ = [
-    "EDITABLE_REQUIRES",
     "FALLBACK_BACKEND",
     "OVERRIDE_KEYS",
     "PYPROJECT",

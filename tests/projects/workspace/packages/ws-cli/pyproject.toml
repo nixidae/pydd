@@ -16,9 +16,7 @@ dependencies = [
 ws-cli = "ws_cli:main"
 
 [build-system]
-# `editables` is a hand edit, and `../../README.md` gives the reason. hatchling
-# imports it for a PEP 660 build and declares it nowhere.
-requires = ["hatchling", "editables"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.uv.sources]

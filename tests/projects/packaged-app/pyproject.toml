@@ -12,10 +12,7 @@ dependencies = [
 packaged-app = "packaged_app:main"
 
 [build-system]
-# `uv init` wrote `["hatchling"]`, and `editables` is a hand edit. hatchling
-# reads `from editables import EditableProject` for a PEP 660 build, and the
-# metadata of hatchling names four other packages and not that one.
-requires = ["hatchling", "editables"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 # **The tools that build this project, pinned by the same lock file.**
@@ -24,7 +21,6 @@ build-backend = "hatchling.build"
 # these enters the environment. `../README.md` gives the reason for each one.
 [dependency-groups]
 build = [
-    "editables>=0.5",
     "flit-core>=3.12.0",
     "hatchling>=1.31.0",
     "installer>=1.0.1",

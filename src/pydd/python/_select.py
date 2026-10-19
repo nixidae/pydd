@@ -42,10 +42,6 @@ FALLBACK_BACKEND = "setuptools.build_meta:__legacy__"
 #: `wheel` package.
 FALLBACK_REQUIRES = ("setuptools>=40.8.0",)
 
-#: What a backend's `get_requires_for_build_editable` adds, by backend. The
-#: planner cannot call that hook: the backend is not built when it plans.
-EDITABLE_REQUIRES = {"hatchling.build": ("editables",)}
-
 #: The oldest glibc minor version that a `manylinux_2_Y` tag names. PEP 600
 #: defines the scheme, and 2.17 is the floor that `manylinux2014` corresponds
 #: to. The newest is the target's own glibc.
