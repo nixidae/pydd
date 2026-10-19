@@ -603,6 +603,9 @@ let
       # The platform of a wheel tag, which PEP 425 spells differently from
       # `platform_machine`.
       platform = "${if hostPlatform.isDarwin then "macosx" else "linux"}_${hostPlatform.parsed.cpu.name}";
+      # The newest manylinux or musllinux tag that runs here.
+      libc = hostPlatform.libc;
+      libcVersion = if hostPlatform.isLinux then pkgs.stdenv.cc.libc.version else "";
       markers = targetMarkers // markers;
     };
   };

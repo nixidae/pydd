@@ -32,7 +32,7 @@ MARKERS = {
 
 def target(**markers: str) -> Target:
     return Target(
-        tags=tuple(target_tags("3.14", "linux_x86_64")),
+        tags=tuple(target_tags("3.14", "linux_x86_64", (), "glibc", "2.44")),
         markers={**MARKERS, **markers},
         python_version="3.14",
         platform="linux_x86_64",

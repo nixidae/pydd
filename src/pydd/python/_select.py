@@ -46,10 +46,10 @@ FALLBACK_REQUIRES = ("setuptools>=40.8.0",)
 #: planner cannot call that hook: the backend is not built when it plans.
 EDITABLE_REQUIRES = {"hatchling.build": ("editables",)}
 
-#: The oldest and the newest glibc minor version that a `manylinux_2_Y` tag
-#: may name. PEP 600 defines the scheme, and 2.17 is the floor that
-#: `manylinux2014` corresponds to.
-GLIBC_MINORS = range(17, 40)
+#: The oldest glibc minor version that a `manylinux_2_Y` tag names. PEP 600
+#: defines the scheme, and 2.17 is the floor that `manylinux2014` corresponds
+#: to. The newest is the target's own glibc.
+GLIBC_FLOOR = 17
 
 #: Every key that PEP 508 defines for a marker environment.
 #:
@@ -193,27 +193,40 @@ class Target:
         return Marker(marker).evaluate(self.markers)
 
 
-def target_platforms(platform: str) -> list[str]:
+def target_platforms(platform: str, libc: str = "", libc_version: str = "") -> list[str]:
     """Every platform tag that a wheel may carry for this target, best first.
 
-    **`packaging.tags.platform_tags` reads the glibc of the machine that calls
-    it**, so this list is the one part that a planner has to state itself. PEP
-    600 says a `manylinux_2_Y` wheel runs against every glibc at or above 2.Y,
-    so each version at or below the target fits and the newest one is the
-    closest fit.
+    **`packaging.tags.platform_tags` reads the libc of the machine that calls
+    it**, so this list is the one part that a planner has to state itself, from
+    the target's libc and its version.
+
+    - PEP 600: a `manylinux_2_Y` wheel runs against every glibc at or above
+      2.Y, so each Y from the target's minor down to 17 fits, newest first.
+    - PEP 656: the same rule for `musllinux_1_Y` and musl 1.Y. A manylinux
+      wheel does not run on musl, and a musllinux one does not run on glibc.
     """
     if not platform.startswith("linux_"):
         return [platform]
     arch = platform.removeprefix("linux_")
-    return [
-        *[f"manylinux_2_{glibc}_{arch}" for glibc in reversed(GLIBC_MINORS)],
-        # The legacy alias of `manylinux_2_17`, which PEP 600 keeps valid.
-        f"manylinux2014_{arch}",
-        platform,
-    ]
+    major, minor = (int(part) for part in libc_version.split(".")[:2]) if libc_version else (0, 0)
+    if libc == "glibc" and major == 2:
+        return [
+            *[f"manylinux_2_{glibc}_{arch}" for glibc in range(minor, GLIBC_FLOOR - 1, -1)],
+            # The legacy alias of `manylinux_2_17`, which PEP 600 keeps valid.
+            f"manylinux2014_{arch}",
+            platform,
+        ]
+    if libc == "musl" and major == 1:
+        return [*[f"musllinux_1_{musl}_{arch}" for musl in range(minor, -1, -1)], platform]
+    raise RuntimeError(
+        f"the target's libc is '{libc} {libc_version}'. pydd knows glibc 2.Y (manylinux) and "
+        "musl 1.Y (musllinux), and a guess would take wheels that do not run there."
+    )
 
 
-def target_tags(python_version: str, platform: str, abis: Sequence[str] = ()) -> list[Tag]:
+def target_tags(
+    python_version: str, platform: str, abis: Sequence[str] = (), libc: str = "", libc_version: str = ""
+) -> list[Tag]:
     """The tags this environment accepts, in the order that pip prefers them.
 
     **`packaging` computes this, and this function only states the target.**
@@ -236,7 +249,7 @@ def target_tags(python_version: str, platform: str, abis: Sequence[str] = ()) ->
     means the plain build, `cpXY`, and never the planner's own.
     """
     major, minor = (int(part) for part in python_version.split("."))
-    platforms = target_platforms(platform)
+    platforms = target_platforms(platform, libc, libc_version)
     return [
         *cpython_tags(python_version=(major, minor), abis=list(abis) or [f"cp{major}{minor}"], platforms=platforms),
         *compatible_tags(python_version=(major, minor), interpreter=f"cp{major}{minor}", platforms=platforms),
@@ -359,7 +372,11 @@ def target_from_environ() -> Target:
     python_version = document["pythonVersion"]
     platform = document["platform"]
     return Target(
-        tags=tuple(target_tags(python_version, platform, document["abis"])),
+        tags=tuple(
+            target_tags(
+                python_version, platform, document["abis"], document.get("libc", ""), document.get("libcVersion", "")
+            )
+        ),
         # `extra` is not a field of the environment. It is the name that a
         # marker of an optional dependency compares against, and an empty
         # value makes each such marker false, which is what an edge that the

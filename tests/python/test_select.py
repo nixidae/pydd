@@ -44,6 +44,8 @@ if TYPE_CHECKING:
 #: The target that the example plans for: CPython 3.13 on x86_64 Linux.
 PYTHON_VERSION = "3.13"
 PLATFORM = "linux_x86_64"
+#: The libc of nixpkgs when this was written.
+LIBC = ("glibc", "2.44")
 
 #: Every key of PEP 508. A short set would let `packaging` read the
 #: interpreter that runs this test, and `PEP508_KEYS` exists to stop that.
@@ -63,7 +65,14 @@ MARKERS = {
 }
 
 #: The document that `default.nix` puts in `PYDD_TARGET`, as JSON.
-TARGET_DOCUMENT = {"markers": MARKERS, "pythonVersion": PYTHON_VERSION, "platform": PLATFORM, "abis": ["cp313"]}
+TARGET_DOCUMENT = {
+    "markers": MARKERS,
+    "pythonVersion": PYTHON_VERSION,
+    "platform": PLATFORM,
+    "abis": ["cp313"],
+    "libc": LIBC[0],
+    "libcVersion": LIBC[1],
+}
 
 #: One row of `PYDD_INPUTS`, as `uv.nix` writes it for a wheel to fetch.
 ROW = {
@@ -97,7 +106,7 @@ def sdist(package: str, version: str, **rest: str) -> Artifact:
 @pytest.fixture
 def target() -> Target:
     return Target(
-        tags=tuple(target_tags(PYTHON_VERSION, PLATFORM)),
+        tags=tuple(target_tags(PYTHON_VERSION, PLATFORM, (), *LIBC)),
         markers=MARKERS,
         python_version=PYTHON_VERSION,
         platform=PLATFORM,
@@ -137,7 +146,7 @@ class TestTags:
 
     def test_a_manylinux_older_than_the_floor_does_not_fit(self, target: Target) -> None:
         # PEP 600 names the oldest glibc that the wheel runs against, and
-        # `GLIBC_MINORS` starts at 2.17, which is `manylinux2014`.
+        # `GLIBC_FLOOR` is 2.17, which is `manylinux2014`.
         assert wheel_rank(wheel("demo", "1.0", "cp313-cp313-manylinux_2_5_x86_64"), target.tags) is None
 
     def test_abi3_fits(self, target: Target) -> None:
@@ -171,7 +180,7 @@ class TestTags:
         # planner states what it plans for and `packaging` answers. A tag set
         # written by hand missed the third of these four, which is the one that
         # `pyzmq` ships.
-        accepted = set(target_tags(PYTHON_VERSION, PLATFORM))
+        accepted = set(target_tags(PYTHON_VERSION, PLATFORM, (), *LIBC))
         assert Tag("cp313", "cp313", "manylinux_2_28_x86_64") in accepted
         assert Tag("cp313", "abi3", "manylinux_2_28_x86_64") in accepted
         assert Tag("cp312", "abi3", "manylinux_2_28_x86_64") in accepted
@@ -181,22 +190,41 @@ class TestTags:
         # PEP 600: a `manylinux_2_Y` wheel runs against every glibc at or above
         # 2.Y, so each version at or below the target fits and the newest one
         # is the closest fit. `manylinux2014` is the legacy alias of 2.17.
-        platforms = target_platforms("linux_x86_64")
+        platforms = target_platforms("linux_x86_64", *LIBC)
         assert platforms[-1] == "linux_x86_64"
         assert "manylinux2014_x86_64" in platforms
         assert platforms.index("manylinux_2_28_x86_64") < platforms.index("manylinux_2_17_x86_64")
 
+    def test_the_range_ends_at_the_targets_glibc(self) -> None:
+        # A fixed ceiling refused `manylinux_2_40` on glibc 2.44.
+        platforms = target_platforms("linux_x86_64", "glibc", "2.44")
+        assert platforms[0] == "manylinux_2_44_x86_64"
+        assert "manylinux_2_40_x86_64" in platforms
+        assert "manylinux_2_45_x86_64" not in platforms
+
+    def test_a_musl_target_takes_musllinux_and_no_manylinux(self) -> None:
+        # PEP 656. A manylinux wheel links glibc and does not run on musl.
+        platforms = target_platforms("linux_x86_64", "musl", "1.2.6")
+        assert platforms == ["musllinux_1_2_x86_64", "musllinux_1_1_x86_64", "musllinux_1_0_x86_64", "linux_x86_64"]
+
+    @pytest.mark.parametrize("libc", [("", ""), ("uclibc", "1.0"), ("glibc", "")])
+    def test_a_linux_target_with_an_unknown_libc_is_refused(self, libc: tuple[str, str]) -> None:
+        with pytest.raises(RuntimeError, match="libc"):
+            target_platforms("linux_x86_64", *libc)
+
     def test_a_free_threaded_target_takes_its_own_abi_and_not_abi3(self) -> None:
         # The planner runs a GIL interpreter, so these tags come from the
         # argument alone. `abi3` does not load into a free-threaded build.
-        accepted = set(target_tags(PYTHON_VERSION, PLATFORM, ["cp313t"]))
+        accepted = set(target_tags(PYTHON_VERSION, PLATFORM, ["cp313t"], *LIBC))
         assert Tag("cp313", "cp313t", "manylinux_2_28_x86_64") in accepted
         assert Tag("cp313", "cp313", "manylinux_2_28_x86_64") not in accepted
         assert Tag("cp313", "abi3", "manylinux_2_28_x86_64") not in accepted
         assert Tag("py3", "none", "any") in accepted
 
     def test_no_abis_is_the_plain_build_and_not_the_planners(self) -> None:
-        assert target_tags(PYTHON_VERSION, PLATFORM) == target_tags(PYTHON_VERSION, PLATFORM, ["cp313"])
+        assert target_tags(PYTHON_VERSION, PLATFORM, (), *LIBC) == target_tags(
+            PYTHON_VERSION, PLATFORM, ["cp313"], *LIBC
+        )
 
     @pytest.mark.parametrize("platform", ["macosx_11_0_arm64", "win_amd64", "any"])
     def test_a_platform_that_is_not_linux_travels_alone(self, platform: str) -> None:
@@ -316,7 +344,7 @@ class TestTheTargetComesFromTheNixHalf:
         read = target_from_environ()
         assert read.python_version == PYTHON_VERSION
         assert read.platform == PLATFORM
-        assert read.tags == tuple(target_tags(PYTHON_VERSION, PLATFORM))
+        assert read.tags == tuple(target_tags(PYTHON_VERSION, PLATFORM, (), *LIBC))
 
     def test_the_extra_is_empty_whatever_the_document_says(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # An edge of an optional dependency carries `extra == '...'`, and the
