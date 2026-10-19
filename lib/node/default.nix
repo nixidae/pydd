@@ -73,6 +73,19 @@ let
       # `[ "apps/server" ]`: each one, every member it links to, and the
       # project, as `pnpm --filter <member>...` takes them. `null`: all.
       members ? null,
+      # The tool of the lock, on `PATH` for the root's scripts: a bun project's
+      # `build` runs `bun run ...`. `null`: npm only.
+      packageManager ?
+        {
+          "pnpm-lock.yaml" = pkgs.pnpm;
+          "bun.lock" = pkgs.bun;
+          "yarn.lock" = pkgs.yarn;
+        }
+        .${lockfile} or null,
+      # The environment of the root's `scripts`, as
+      # `{ VITE_API_URL = "/api"; }`. A package's install script takes
+      # `overrides.<name>.env` instead.
+      scriptEnv ? { },
     }:
     assert lib.assertMsg (lockfile != null) (
       "pydd.node.npm: ${toString project} holds no package-lock.json, pnpm-lock.yaml, bun.lock "
@@ -151,7 +164,8 @@ let
       ]
       ++ scriptTools
       ++ lib.concatLists (builtins.attrValues tools)
-      ++ builtins.filter lib.isDerivation (builtins.attrValues sources);
+      ++ builtins.filter lib.isDerivation (builtins.attrValues sources)
+      ++ lib.optional (packageManager != null) packageManager;
       refs = builtins.listToAttrs (
         map (drv: {
           name = builtins.unsafeDiscardStringContext "${drv}";
@@ -182,7 +196,9 @@ let
         install_scripts = declared.installScripts or [ ] ++ installScripts;
       }
       # Only when set, so the menu of every other project keeps its hash.
-      // lib.optionalAttrs (members != null) { inherit members; };
+      // lib.optionalAttrs (members != null) { inherit members; }
+      // lib.optionalAttrs (packageManager != null) { manager = "${packageManager}"; }
+      // lib.optionalAttrs (scriptEnv != { }) { script_env = scriptEnv; };
       # On released Nix the host makes each node, and the planner writes only
       # the root (`./graph.nix`). Each node's `.drv` is an input of the
       # planner, and nothing builds it until the root names it.

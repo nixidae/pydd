@@ -188,6 +188,13 @@ project only, as those tools do. The project builds in the build directory, and 
 `$out/lib/node_modules`: TypeScript, and api-extractor over it, skip
 every file under a `node_modules`, the project's own included.
 
+**The scripts get the tool of the lock.** A bun project's `build` runs
+`bun run typecheck && bun --bun vite build`. So the root has
+`packageManager` on `PATH`: pnpm, bun or Yarn, by the lock, and nothing
+more for npm. Only the root gets it; a package's install script runs as
+npm runs it. `scriptEnv` sets the environment of the scripts, as
+`{ VITE_API_URL = "/api"; }`.
+
 The root then removes what `omit` leaves out, and the directories that
 this leaves empty. It links each program of the project and of its
 workspace members into `bin`.

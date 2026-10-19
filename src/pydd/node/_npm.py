@@ -70,6 +70,10 @@ class Menu:
     #: The workspace members to install, by path, as `pnpm --filter <member>...`
     #: takes them. `None`: every member.
     members: list[str] | None = None
+    #: The tool of the lock, such as bun, which only the root's scripts get.
+    manager: str | None = None
+    #: The environment of the root's scripts.
+    script_env: dict[str, str] = field(default_factory=dict[str, str])
 
     @property
     def directory(self) -> str:
@@ -358,12 +362,14 @@ class Graph:
         package: str | None = None,
         scripted: bool = False,
         as_file: bool = False,
+        extra: list[str] | None = None,
+        extra_env: dict[str, str] | None = None,
     ) -> Derivation:
         menu = self.menu
         native = menu.native.get(package or "", {"tools": [], "env": {}}) if scripted else {"tools": [], "env": {}}
-        tools = [*native["tools"], *(menu.tools if scripted else [])]
+        tools = [*native["tools"], *(extra or []), *(menu.tools if scripted else [])]
         env = tool_env(tools, f"{menu.nodejs}/bin") | {"PYDD_NPM": dump(spec)} | FLOATING
-        env |= native["env"]
+        env |= native["env"] | (extra_env or {})
         if as_file:
             # One variable holds at most 128 KiB, and the root's spec names every package.
             env["passAsFile"] = "PYDD_NPM"
@@ -548,8 +554,18 @@ class Graph:
             spec["build_probes"] = build_probes
             spec["probes"] = bin_probes(lock, [path for path in [*tree, *links] if path in shipped or path in links])
         inputs = [self.nodes[path] for path in tree]
+        extra = [self.menu.manager] if self.menu.manager else []
         return self.planner.add(
-            self.derivation(self.menu.name, spec, inputs, lock.packages[""].get("name"), True, as_file=True)
+            self.derivation(
+                self.menu.name,
+                spec,
+                inputs,
+                lock.packages[""].get("name"),
+                True,
+                as_file=True,
+                extra=extra,
+                extra_env=self.menu.script_env,
+            )
         )
 
 
