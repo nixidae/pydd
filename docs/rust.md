@@ -83,6 +83,13 @@ graph:
 needs `root`, a directory that holds both: `tests/rust/monorepo` builds
 `tool` with `shared` beside it.
 
+**`files` places builds of other lanes into the source.** A crate that
+embeds a web build at compile time, as rust-embed does, reads a directory
+that the repository does not hold. `files.dist = "${frontend}/dist";`
+copies it to `dist` under `root`. The lock and the manifests are still
+read from `project`, so evaluation does not wait on that build.
+kubecove-server embeds the output of `pydd.node.npm` this way.
+
 **A git dependency needs its hash**, as `importCargoLock` takes it:
 `outputHashes."itoa-1.0.15" = "sha256-...";`, or
 `allowBuiltinFetchGit = true`. nixpkgs writes cargo's source replacement

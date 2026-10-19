@@ -60,6 +60,11 @@ let
       # `{ zstd-sys.env.ZSTD_SYS_USE_PKG_CONFIG = "1"; }`. `env` adds to the
       # hints of the crate, and wins per variable.
       overrides ? { },
+      # Store paths placed into the source tree, by path relative to `root`,
+      # as `{ dist = "${frontend}/dist"; }` for a crate that embeds a web
+      # build. The lock and the manifests are still read from `project`, so
+      # evaluation does not wait on these builds.
+      files ? { },
     }:
     assert lib.assertMsg (builtins.pathExists (project + "/Cargo.lock")) (
       "pydd.rust.cargo: ${toString project} holds no Cargo.lock. The planner builds what "
@@ -116,7 +121,7 @@ let
       }) (tools // env);
 
       # A store path, such as a fetch, is taken as it is.
-      source =
+      tree =
         if builtins.isPath root then
           lib.cleanSourceWith {
             src = root;
@@ -125,6 +130,23 @@ let
           }
         else
           root;
+      source =
+        if files == { } then
+          tree
+        else
+          pkgs.runCommand "${name}-source" { } (
+            ''
+              cp -r ${tree} $out
+              chmod -R u+w $out
+            ''
+            + lib.concatStrings (
+              lib.mapAttrsToList (path: file: ''
+                mkdir -p "$out/${dirOf path}"
+                rm -rf "$out/${path}"
+                cp -r ${file} "$out/${path}"
+              '') files
+            )
+          );
       subdir =
         if root == project then
           "."
