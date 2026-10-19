@@ -14,8 +14,13 @@ let
     venvName = "root-before-override";
   };
   root = (base.override { inherit venvName; }).overrideAttrs (old: {
+    nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.makeWrapper ];
     postInstall = (old.postInstall or "") + ''
       echo "the hook ran" > "$out/hooked"
+    '';
+    # A program of the root is a link into the dynamic output.
+    postFixup = (old.postFixup or "") + ''
+      wrapProgram "$out/bin/python" --set PYDD_WRAPPED yes
     '';
   });
 in
@@ -38,6 +43,12 @@ assert root.name == venvName;
           return 1
         fi
         "${root}/bin/python" -c 'import rich; print("rich", rich.__file__)' || return 1
+        wrapped="$("${root}/bin/python" -c 'import os; print(os.environ.get("PYDD_WRAPPED"))')" || return 1
+        echo "wrapped      $wrapped"
+        if [ "$wrapped" != yes ]; then
+          echo "the wrapper of postFixup does not run" >&2
+          return 1
+        fi
       }
       if ! report > "$out" 2>&1; then
         while IFS= read -r line; do printf '%s\n' "$line" >&2; done < "$out"
