@@ -1,0 +1,95 @@
+# Python: the standards, and what pydd does with each
+
+This page lists every PyPA specification that changes what pydd installs or
+builds, and gives each one a status. It is the record for nixidae/nixidae#486
+(uv) and nixidae/nixidae#488 (Poetry). `PACKAGING-FACTS.md` holds the
+measurements; this page holds the inventory.
+
+The source of each row is <https://packaging.python.org/en/latest/specifications/>,
+read on 2026-10-19, and the code that the row names.
+
+| status | meaning |
+| --- | --- |
+| covered | pydd implements it, and a test or fixture shows it |
+| delegated | `packaging` or `pypa/installer`, the reference implementations, do it |
+| refused | pydd stops with a message that names the gap |
+| wrong | pydd builds something, and the result is not what the standard says |
+| missing | pydd does not read it, and says nothing |
+
+**A `wrong` row is the worst kind.** It builds, and the fault shows at run
+time on another machine. Each one has an issue.
+
+## Selection: which artefact a target takes
+
+| specification | status | where |
+| --- | --- | --- |
+| PEP 503 name normalisation | delegated | `_select.choose`, `canonicalize_name` |
+| PEP 440 versions and specifiers | delegated | `_select.choose`, `requirement.specifier` |
+| PEP 508 markers, all eleven keys | covered | `_select.PEP508_KEYS`, `target_from_environ` refuses a short set |
+| PEP 425 tags, CPython | delegated | `_select.target_tags`, `cpython_tags` and `compatible_tags` |
+| PEP 427 build tag breaks a tie | covered | `_select.build_tag` |
+| PEP 384 stable ABI (`abi3`) | delegated | `cpython_tags`; the pyzmq case in `target_tags` |
+| ABI flags `t` (free-threaded) and `d` (debug) | **wrong**, nixidae/nixidae#842 | `cpython_tags` reads `Py_GIL_DISABLED` and `Py_DEBUG` from the planner's interpreter, and the planner runs `python3`, not the target |
+| PEP 600 `manylinux_2_Y` | **wrong**, nixidae/nixidae#843 | `_select.GLIBC_MINORS` is 17 to 39 for every target. The target's glibc is not read, so a `manylinux_2_40` wheel is refused on a glibc 2.44 target |
+| PEP 656 `musllinux` | missing, nixidae/nixidae#846 | `target_platforms` knows `linux_` and nothing else |
+| macOS platform tags | **wrong**, nixidae/nixidae#844 | `planner.nix` writes `macosx_<cpu>`, as `macosx_aarch64`. No wheel carries that tag, so a darwin target takes no binary wheel and builds every source distribution |
+| PyPy and other implementations | **wrong**, nixidae/nixidae#845 | the markers say `PyPy`, but the tags are CPython's, so a CPython wheel is accepted |
+
+## Building: PEP 517, 518 and 660
+
+| specification | status | where |
+| --- | --- | --- |
+| PEP 518 `[build-system] requires` | covered | `_select.build_system` |
+| PEP 517 default backend | covered | `FALLBACK_BACKEND`, `FALLBACK_REQUIRES` |
+| `build_wheel`, `build_sdist` | covered | `build-local.py`, `_sdist_planner.py` |
+| PEP 660 `build_editable` | covered | `build-local.py`, `projects/workspace` |
+| `backend-path` (in-tree backend) | covered | `build-local.py:in_tree_path`, refuses a path that leaves the tree |
+| `config_settings` | covered | override key `config-settings` |
+| `get_requires_for_build_*` | missing, nixidae/nixidae#847 | not called; `EDITABLE_REQUIRES` is a fixed table of one backend. A backend that adds a requirement at build time fails inside the build |
+| `prepare_metadata_for_build_*` | not needed | the lock file holds the metadata |
+
+## Installing: the wheel format, and the environment
+
+| specification | status | where |
+| --- | --- | --- |
+| Binary distribution format, `RECORD`, `.dist-info` | delegated | `install-wheel.sh` runs `pypa/installer` |
+| Entry points: `console_scripts`, `gui_scripts` | delegated | `pypa/installer` writes the scripts |
+| `.data/scripts` with `#!python` | delegated | `pypa/installer` rewrites the shebang |
+| `.data/purelib`, `.data/platlib` | delegated | `pypa/installer` |
+| `.data/data` and `.data/headers` | **wrong**, nixidae/nixidae#841 | `pypa/installer` writes them under the node's prefix (`share/`, `include/`), and `make-venv.py` merges only `site-packages` and `bin`. A Jupyter kernel spec or a man page is not in the environment |
+| Shebang rewrite into the environment | covered | `make-venv.py:link_script` |
+| The `/bin/sh` trampoline for a long interpreter path | missing | `is_python_shebang` reads the first line only, so a trampoline keeps the store interpreter. A store path is short, so this is a trap, not a fault today |
+| PEP 420 namespace packages across distributions | covered | `make-venv.py:link_tree` merges directories |
+| `.pth` files | covered | linked into `site-packages`; `build-local.py` rewrites an editable one |
+| Two distributions that ship one file | covered | `make-venv.py:Owners`, a fixed rule and a warning |
+| PEP 610 `direct_url.json`, `INSTALLER`, `REQUESTED` | delegated | what `pypa/installer` writes |
+
+## Lock files and other inputs
+
+| specification | status | where |
+| --- | --- | --- |
+| `uv.lock`: forks, `resolution-markers`, `conflicts` | covered | `_uvlock.py` |
+| `uv.lock`: extras and PEP 735 groups | covered | `uv.nix` arguments `extras`, `groups` |
+| `poetry.lock` 2.1 | covered | `_poetrylock.py`, `poetry.nix` |
+| PEP 751 `pylock.toml` | missing, nixidae/nixidae#848 | no reader. `packaging.pylock` parses it; `PACKAGING-FACTS.md` has the study |
+| PEP 723 inline script metadata | missing, nixidae/nixidae#849 | no reader for a script, or for the `.lock` that `uv lock --script` writes |
+| PEP 625 source distribution names | delegated | `packaging` parses the file name |
+
+## Overrides: a package that is broken upstream
+
+`[tool.pydd.overrides.<package>]`, read by `lib/python/overrides.nix`, gives a
+node `env`, `config-settings`, `patches`, `pre-build`, `post-install`,
+`fixup` and `build-tools`. `[tool.pydd.from-nixpkgs]` replaces a node with a
+package of nixpkgs. What no key can say yet:
+
+- a runtime dependency that a distribution forgot to declare, or one it
+  declares and does not need;
+- a different artefact for one package, such as a fixed wheel at another URL.
+
+nixidae/nixidae#850 tracks both.
+
+## What comes next
+
+Each `wrong` and `missing` row has an issue under `source: pydd`. The order of
+work is the cost of the fault to a real project: `.data` first, then the ABI
+flags, then glibc.
