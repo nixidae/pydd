@@ -76,6 +76,8 @@ class Version:
     libc: list[str] | None = None
     bin: dict[str, str] | None = None
     has_bin: bool = False
+    #: The patch that pnpm applies to this version, relative to the project.
+    patch: str | None = None
 
     def entry(self, scripted: bool) -> dict[str, Any]:
         entry: dict[str, Any] = {"name": self.name, "version": self.version, "resolved": self.resolved}
@@ -90,6 +92,8 @@ class Version:
                 entry[key] = value
         if self.has_bin and self.bin is None:
             entry["hasBin"] = True
+        if self.patch is not None:
+            entry["patch"] = self.patch
         if scripted:
             entry["hasInstallScript"] = True
         return entry
@@ -244,12 +248,31 @@ def read_pnpm(directory: str, data: dict[str, Any]) -> tuple[Graph, set[str]]:
         raise SystemExit(
             f"pydd.node.npm: pnpm-lock.yaml has version {version}. pydd reads version 9, of pnpm 9 and 10."
         )
+    settings: dict[str, Any] = {}
+    workspace = Path(directory, "pnpm-workspace.yaml")
+    if workspace.is_file():
+        import yaml
+
+        settings = yaml.safe_load(workspace.read_text(encoding="utf-8")) or {}
+    root = manifest(directory, "").get("pnpm", {})
+    # The lock holds only each patch's hash; the project names its file.
+    patches: dict[str, str] = root.get("patchedDependencies", {}) | (settings.get("patchedDependencies") or {})
+    patched = data.get("patchedDependencies") or {}
     metadata = data.get("packages") or {}
     versions = {}
     for key, snapshot in (data.get("snapshots") or {}).items():
         name, ref = split_id(key)
         meta = metadata[f"{name}@{peel(ref)}"]
         listed = lambda value: [value] if isinstance(value, str) else value  # noqa: E731
+        patch = None
+        # Not `patch_hash=` in the key: a peer's own patch shows there too.
+        if f"{name}@{peel(ref)}" in patched:
+            patch = patches.get(f"{name}@{peel(ref)}", patches.get(name))
+            if patch is None:
+                raise SystemExit(
+                    f"pydd.node.npm: pnpm-lock.yaml patches {name}@{peel(ref)}, and neither "
+                    "pnpm-workspace.yaml nor package.json names its patch file."
+                )
         versions[key] = Version(
             name=name,
             version=peel(ref),
@@ -261,6 +284,7 @@ def read_pnpm(directory: str, data: dict[str, Any]) -> tuple[Graph, set[str]]:
             cpu=listed(meta.get("cpu")),
             libc=listed(meta.get("libc")),
             has_bin=bool(meta.get("hasBin")),
+            patch=patch,
         )
     importers = {}
     for path, importer in sorted((data.get("importers") or {}).items(), key=lambda item: item[0] != "."):
@@ -269,19 +293,14 @@ def read_pnpm(directory: str, data: dict[str, Any]) -> tuple[Graph, set[str]]:
             for kind in ("dependencies", "devDependencies", "optionalDependencies")
         }
     graph = Graph(versions, importers, lambda name, ref: pnpm_key(name, ref))
-    built = set(manifest(directory, "").get("pnpm", {}).get("onlyBuiltDependencies", []))
-    workspace = Path(directory, "pnpm-workspace.yaml")
-    if workspace.is_file():
-        import yaml
-
-        settings = yaml.safe_load(workspace.read_text(encoding="utf-8")) or {}
-        built |= set(settings.get("onlyBuiltDependencies", []))
-        # pnpm 11: `allowBuilds`, by name or by `name@version`.
-        built |= {
-            split_id(spec)[0] if "@" in spec[1:] else spec
-            for spec, allowed in (settings.get("allowBuilds") or {}).items()
-            if allowed is True
-        }
+    built = set(root.get("onlyBuiltDependencies", []))
+    built |= set(settings.get("onlyBuiltDependencies", []))
+    # pnpm 11: `allowBuilds`, by name or by `name@version`.
+    built |= {
+        split_id(spec)[0] if "@" in spec[1:] else spec
+        for spec, allowed in (settings.get("allowBuilds") or {}).items()
+        if allowed is True
+    }
     return graph, built
 
 

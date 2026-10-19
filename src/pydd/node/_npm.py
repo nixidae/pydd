@@ -439,6 +439,7 @@ class Graph:
         tarball, inputs, srcs = self.tarball(path)
         name = name_of(path, entry)
         scripted = bool(entry.get("hasInstallScript"))
+        patch = entry.get("patch")
         tree: dict[str, str] = {}
         links: dict[str, str] = {}
         probes: list[list[str]] = []
@@ -474,7 +475,13 @@ class Graph:
             spec["probes"] = probes
         if entry.get("hasBin") and "bin" not in entry:
             spec["bins"] = None
-        drv = self.derivation(f"{store_name(name)}-{entry.get('version', '0')}", spec, inputs, name, scripted)
+        if patch is not None:
+            spec["patch"] = posixpath.join(self.menu.directory, patch)
+            spec["srcs"] = sorted({*srcs, self.menu.project})
+        # A patched node runs `patch`, one of the script tools.
+        drv = self.derivation(
+            f"{store_name(name)}-{entry.get('version', '0')}", spec, inputs, name, scripted or patch is not None
+        )
         self.planning.pop()
         self.nodes[path] = self.planner.add(drv)
         return self.nodes[path]

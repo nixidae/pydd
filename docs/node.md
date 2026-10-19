@@ -82,6 +82,13 @@ against it. This is the problem of Go's `go.sum` (pydd#25).
 Nix. Nix reads no YAML, and the host would need each reader a second
 time.
 
+**pnpm's patches apply in the package's node.** pnpm's lock gives only
+the hash of each patch, in `patchedDependencies`. The project names the
+file, in `pnpm-workspace.yaml` or in `"pnpm"` of `package.json`. The node
+runs `patch --strip=1` after it unpacks the package, before any install
+script. A patched version whose file the project does not name is
+refused.
+
 ## One node per package
 
 | entry | nodes | output |

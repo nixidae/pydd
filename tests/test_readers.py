@@ -100,3 +100,29 @@ def test_yarn_berry_is_refused(tmp_path: Path) -> None:
 def test_old_pnpm_lock_is_refused(tmp_path: Path) -> None:
     with pytest.raises(SystemExit, match=r"version 6\.0"):
         read_pnpm(str(tmp_path), {"lockfileVersion": "6.0"})
+
+
+def pnpm_lock(patched: dict[str, str]) -> dict[str, Any]:
+    integrity = {"integrity": "sha512-AAAA"}
+    return {
+        "lockfileVersion": "9.0",
+        "patchedDependencies": patched,
+        "importers": {".": {"dependencies": {"a": {"specifier": "1.0.0", "version": "1.0.0(patch_hash=x)"}}}},
+        "packages": {"a@1.0.0": {"resolution": integrity}, "b@2.0.0": {"resolution": integrity}},
+        # b's key holds a's patch hash through its peer, and b has no patch.
+        "snapshots": {"a@1.0.0(patch_hash=x)": {}, "b@2.0.0(a@1.0.0(patch_hash=x))": {}},
+    }
+
+
+def test_pnpm_patch_names_its_file(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text("{}")
+    (tmp_path / "pnpm-workspace.yaml").write_text("patchedDependencies:\n  a@1.0.0: patches/a.patch\n")
+    graph, _ = read_pnpm(str(tmp_path), pnpm_lock({"a@1.0.0": "x"}))
+    assert graph.versions["a@1.0.0(patch_hash=x)"].patch == "patches/a.patch"
+    assert graph.versions["b@2.0.0(a@1.0.0(patch_hash=x))"].patch is None
+
+
+def test_pnpm_patch_without_its_file_is_refused(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text("{}")
+    with pytest.raises(SystemExit, match="names its patch file"):
+        read_pnpm(str(tmp_path), pnpm_lock({"a@1.0.0": "x"}))

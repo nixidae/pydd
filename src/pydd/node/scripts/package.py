@@ -195,10 +195,19 @@ def refuse_prepare(package: Path, name: str) -> None:
         )
 
 
+def apply_patch(spec: dict[str, Any], package: Path) -> None:
+    """Apply the patch of `pnpm patch`, a git diff with paths from the package's root."""
+    if "patch" not in spec:
+        return
+    print(f"pydd: {spec['name']}: applying {posixpath.basename(spec['patch'])}", file=sys.stderr, flush=True)
+    subprocess.run(["patch", "--strip=1", "--batch", "--forward", f"--input={spec['patch']}"], cwd=package, check=True)
+
+
 def package(spec: dict[str, Any], top: Path, out: Path) -> None:
     nodejs = spec["nodejs"]
     if not spec["scripts"]:
         unpack(spec["tarball"], out)
+        apply_patch(spec, out)
         if spec["git"]:
             refuse_prepare(out, spec["name"])
         programs(out, manifest_bins(out) if spec["bins"] is None else spec["bins"])
@@ -208,6 +217,7 @@ def package(spec: dict[str, Any], top: Path, out: Path) -> None:
     place(tree, spec["tree"], {})
     where = tree / spec["path"]
     unpack(spec["tarball"], where)
+    apply_patch(spec, where)
     if spec["git"]:
         refuse_prepare(where, spec["name"])
     place(tree, {}, spec["links"] | probe(tree, spec.get("probes", [])))
