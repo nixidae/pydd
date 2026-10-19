@@ -226,7 +226,8 @@ def peel(ref: Ref) -> str:
 
 def pnpm_key(name: str, ref: Ref) -> str:
     # An alias names the real package and its version: `string-width-cjs: string-width@4.2.3`.
-    if re.match(r"^@?[^@]+@", ref) and not ref[0].isdigit():
+    # A `file:` ref holds an `@` in its peers, and is no alias.
+    if re.match(r"^@?[^@(]+@", ref) and not ref[0].isdigit() and not ref.startswith("file:"):
         return ref
     return f"{name}@{ref}"
 

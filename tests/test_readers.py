@@ -126,3 +126,8 @@ def test_pnpm_patch_without_its_file_is_refused(tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text("{}")
     with pytest.raises(SystemExit, match="names its patch file"):
         read_pnpm(str(tmp_path), pnpm_lock({"a@1.0.0": "x"}))
+
+
+def test_pnpm_file_ref_with_peers_is_no_alias() -> None:
+    ref = "file:modules/text(react@19.3.0)"
+    assert pnpm_key("text", ref) == f"text@{ref}"
