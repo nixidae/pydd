@@ -1,0 +1,25 @@
+version = 1
+revision = 5
+requires-python = ">=3.13"
+
+[[package]]
+name = "platform-probe"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "platformprobe" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "platformprobe", specifier = ">=1.0.0" }]
+
+[[package]]
+name = "platformprobe"
+version = "1.0.0"
+source = { registry = "index" }
+wheels = [
+    { path = "platformprobe-1.0.0-py3-none-manylinux_2_17_x86_64.whl" },
+    { path = "platformprobe-1.0.0-py3-none-manylinux_2_40_x86_64.whl" },
+    { path = "platformprobe-1.0.0-py3-none-manylinux_2_99_x86_64.whl" },
+    { path = "platformprobe-1.0.0-py3-none-musllinux_1_2_x86_64.whl" },
+]

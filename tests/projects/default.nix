@@ -102,10 +102,23 @@ let
     vendored-app = check ./check-vendored.nix { };
     local-index = check ./check-index.nix { };
     wheel-features = check ./check-wheel-features.nix { };
-    abi-gil = check ./check-abi.nix { };
-    abi-free-threaded = check ./check-abi.nix {
+    abi-gil = check ./check-probe.nix {
+      project = ./abi-probe;
+      probe = "abiprobe.ABI";
+      expected = "gil";
+    };
+    abi-free-threaded = check ./check-probe.nix {
+      project = ./abi-probe;
+      probe = "abiprobe.ABI";
       python = pkgs.python313FreeThreading;
       expected = "free-threaded";
+    };
+    # glibc 2.44 at the time of writing. The check names the version it
+    # expects, so a glibc below 2.40 fails it on purpose.
+    platform-glibc = check ./check-probe.nix {
+      project = ./platform-probe;
+      probe = "platformprobe.PLATFORM";
+      expected = "manylinux_2_40";
     };
   };
   # Every planner here runs on the same interpreter and the same `nix`.

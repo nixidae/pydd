@@ -1,0 +1,11 @@
+[project]
+name = "platform-probe"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = ["platformprobe>=1.0.0"]
+
+[[tool.uv.index]]
+name = "local"
+url = "index"
+format = "flat"
+default = true

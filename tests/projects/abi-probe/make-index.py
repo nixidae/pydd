@@ -26,7 +26,9 @@ def write_wheel(abi: str, says: str) -> None:
     files = {
         "abiprobe.py": f"ABI = {says!r}\n",
         f"{dist_info}/METADATA": "Metadata-Version: 2.1\nName: abiprobe\nVersion: 1.0.0\n",
-        f"{dist_info}/WHEEL": f"Wheel-Version: 1.0\nGenerator: pydd make-index.py\nRoot-Is-Purelib: false\nTag: {tag}\n",
+        f"{dist_info}/WHEEL": (
+            f"Wheel-Version: 1.0\nGenerator: pydd make-index.py\nRoot-Is-Purelib: false\nTag: {tag}\n"
+        ),
     }
     record = [f"{path},{record_hash(text.encode())},{len(text.encode())}" for path, text in sorted(files.items())]
     files[f"{dist_info}/RECORD"] = "\n".join([*record, f"{dist_info}/RECORD,,"]) + "\n"
