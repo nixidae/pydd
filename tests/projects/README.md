@@ -38,6 +38,15 @@ Run `uv lock` in the directory of the project, and build again.
 `docs/PACKAGING-FACTS.md` gives what the comparison covers, and the one edit
 that it lets through.
 
+**`pure-app` and `workspace` also hold a `pylock.toml`**, which
+`pylock-pure-app` and `pylock-workspace` build. PEP 751 records no
+declaration, so nothing refuses a stale export: export it again after each
+`uv lock`.
+
+```console
+$ uv export --format pylock.toml --frozen --all-packages -o pylock.toml
+```
+
 ## Two settings that this machine needs
 
 `uv` downloads its own CPython by default, and that interpreter is a

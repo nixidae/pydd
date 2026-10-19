@@ -20,4 +20,14 @@
     `closure` and `env` in its `passthru`.
   */
   poetry = pkgs.lib.makeOverridable (args: import ./poetry.nix ({ inherit pkgs pydd; } // args));
+
+  /**
+    A Python environment from a PEP 751 lock file, planned at build time.
+
+    Takes the arguments of `./pylock.nix`; `project` is the directory that
+    holds `pylock.toml`. Reading the file needs the experimental feature
+    `parse-toml-timestamps`. Returns an ordinary derivation, as `uv` does, with
+    `planner`, `dynamic`, `closure` and `env` in its `passthru`.
+  */
+  pylock = pkgs.lib.makeOverridable (args: import ./pylock.nix ({ inherit pkgs pydd; } // args));
 }

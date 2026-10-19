@@ -73,7 +73,7 @@ time on another machine. Each one has an issue.
 | `uv.lock`: forks, `resolution-markers`, `conflicts` | covered | `_uvlock.py` |
 | `uv.lock`: extras and PEP 735 groups | covered | `uv.nix` arguments `extras`, `groups` |
 | `poetry.lock` 2.1 | covered | `_poetrylock.py`, `poetry.nix` |
-| PEP 751 `pylock.toml` | missing, nixidae/nixidae#848 | no reader. `packaging.pylock` parses it; `PACKAGING-FACTS.md` has the study |
+| PEP 751 `pylock.toml` | covered, nixidae/nixidae#848 | `pylock.nix` and `_pylock.py`; needs `parse-toml-timestamps`. One file is one selection, a backend comes from pydd's lock because uv's export records no edges, and no freshness check runs. `projects/pylock-pure-app`, `pylock-workspace` |
 | PEP 723 inline script metadata | missing, nixidae/nixidae#849 | no reader for a script, or for the `.lock` that `uv lock --script` writes |
 | PEP 625 source distribution names | delegated | `packaging` parses the file name |
 

@@ -14,10 +14,13 @@
   pkgs,
   pydd,
   project ? ./pure-app,
+  # The reader of the lock file: `pydd.python.uv`, or `pydd.python.pylock`
+  # over the `pylock.toml` that uv exports beside `uv.lock`.
+  reader ? pydd.python.uv,
 }:
 
 let
-  planner = pydd.python.uv { inherit project; };
+  planner = reader { inherit project; };
   venv = planner.dynamic;
 in
 (derivation {

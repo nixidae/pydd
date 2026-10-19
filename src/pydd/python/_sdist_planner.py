@@ -43,6 +43,7 @@ from pydd.python import (
 from pydd.python import _build_systems as build_systems
 from pydd.python._hook import requires_for_build, sites_of
 from pydd.python._poetrylock import PoetryProject
+from pydd.python._pylock import PylockProject
 
 
 def main() -> int:
@@ -87,6 +88,8 @@ def main() -> int:
         reader = build_systems.UvLockReader(spec["lock"])
     elif (spec := inputs.get("poetry")) is not None:
         reader = PoetryProject.from_json(spec)
+    elif (spec := inputs.get("pylock")) is not None:
+        reader = PylockProject.from_json(spec)
     requirements = build_systems.backend(reader, requirements, target, sdist.filename, inputs.get("buildSystems"))
 
     # **The tools travel with the inputs, so a nested planner has them too.**

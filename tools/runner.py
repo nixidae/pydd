@@ -46,7 +46,7 @@ class Lane:
         env = {
             **os.environ,
             "NIX_CONFIG": "extra-experimental-features = nix-command ca-derivations dynamic-derivations"
-            " recursive-nix\nuse-cgroups = false",
+            " recursive-nix parse-toml-timestamps\nuse-cgroups = false",
         }
         with anyio.fail_after(timeout):
             result = await anyio.run_process([self.nix, *args], stdout=PIPE, stderr=stderr, check=check, env=env)

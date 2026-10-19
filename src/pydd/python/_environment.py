@@ -72,6 +72,7 @@ from pydd.python import (
 from pydd.python import _build_systems as build_systems
 from pydd.python._hook import requires_for_build, sites_of
 from pydd.python._poetrylock import PoetryProject
+from pydd.python._pylock import PylockProject
 from pydd.python._workspace import members as members_of
 from pydd.python._workspace import selection
 
@@ -401,7 +402,7 @@ def make_plan(
     request: Request,
     projects: list[LocalProject],
     target: Target,
-    reader: UvProject | PoetryProject | None = None,
+    reader: UvProject | PoetryProject | PylockProject | None = None,
     asked: dict[str, list[Requirement]] | None = None,
 ) -> Plan:
     """Turn the lock file into the graph that builds the environment.
@@ -548,11 +549,13 @@ def main() -> int:
     # and a `uv.lock` also names the local projects that install from their
     # own tree.
     roots: list[str] = list(inputs["roots"])
-    reader: UvProject | PoetryProject | None = None
+    reader: UvProject | PoetryProject | PylockProject | None = None
     if (spec := inputs.get("uv")) is not None:
         reader = UvProject.from_json(spec)
     elif (spec := inputs.get("poetry")) is not None:
         reader = PoetryProject.from_json(spec)
+    elif (spec := inputs.get("pylock")) is not None:
+        reader = PylockProject.from_json(spec)
     if reader is not None:
         selected, local = reader.selection(target)
         roots += selected

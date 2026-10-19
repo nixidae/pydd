@@ -29,17 +29,24 @@
   # `null` is the default of `uv.nix`, which reads `[tool.pydd] from-sdist` of
   # the project. A list here replaces that table.
   fromSdist ? null,
+  # Read the `pylock.toml` that uv exports beside `uv.lock`, which is one
+  # selection, instead. It takes no `select` and no `fromSdist`.
+  pylock ? false,
 }:
 
 let
-  planner = pydd.python.uv {
-    inherit
-      project
-      select
-      venvName
-      fromSdist
-      ;
-  };
+  planner =
+    if pylock then
+      pydd.python.pylock { inherit project venvName; }
+    else
+      pydd.python.uv {
+        inherit
+          project
+          select
+          venvName
+          fromSdist
+          ;
+      };
   venv = planner.dynamic;
 
   # One probe for each member that this selection installs. A member that the

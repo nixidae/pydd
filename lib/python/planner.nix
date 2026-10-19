@@ -106,6 +106,9 @@
   # A `poetry.lock` for the planner to read: `{ lock, groups, extras }`.
   # `./poetry.nix` gives a value here.
   poetry ? null,
+  # A `pylock.toml` for the planner to read: `{ lock }`. `./pylock.nix` gives
+  # a value here.
+  pylock ? null,
   # The one member to render as an application, or `null` for the environment.
   #
   # **A virtual environment is not a program.** It carries `bin/python`,
@@ -564,6 +567,10 @@ let
       # `{ lock, groups, extras }`, from `./poetry.nix`. The lock file travels
       # as a store path, as `uvLock` does.
       inherit poetry;
+    }
+    // pkgs.lib.optionalAttrs (pylock != null) {
+      # `{ lock }`, from `./pylock.nix`, as a store path.
+      inherit pylock;
     };
 
   # What every planner reads about the target it plans for. The planner runs on

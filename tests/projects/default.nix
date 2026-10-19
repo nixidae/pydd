@@ -20,11 +20,17 @@ let
   ];
   checks = {
     pure-app = check ./check-uv.nix { };
+    pylock-pure-app = check ./check-uv.nix { reader = pydd.python.pylock; };
     packaged-app = check ./check-packaged.nix { };
     packaged-sdist = check ./check-sdist.nix { };
     workspace-all = check ./check-workspace.nix {
       venvName = "workspace-all";
       expect = everyMember;
+    };
+    pylock-workspace = check ./check-workspace.nix {
+      venvName = "pylock-workspace";
+      expect = everyMember;
+      pylock = true;
     };
     workspace-core = check ./check-workspace.nix {
       venvName = "workspace-core";
