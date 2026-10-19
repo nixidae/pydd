@@ -102,6 +102,11 @@ let
     vendored-app = check ./check-vendored.nix { };
     local-index = check ./check-index.nix { };
     wheel-features = check ./check-wheel-features.nix { };
+    abi-gil = check ./check-abi.nix { };
+    abi-free-threaded = check ./check-abi.nix {
+      python = pkgs.python313FreeThreading;
+      expected = "free-threaded";
+    };
   };
   # Every planner here runs on the same interpreter and the same `nix`.
   inherit (pydd.python.uv { project = ./pure-app; }) closure;
