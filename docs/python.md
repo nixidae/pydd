@@ -53,14 +53,15 @@ time on another machine. Each one has an issue.
 | specification | status | where |
 | --- | --- | --- |
 | Binary distribution format, `RECORD`, `.dist-info` | delegated | `install-wheel.sh` runs `pypa/installer` |
-| Entry points: `console_scripts`, `gui_scripts` | delegated | `pypa/installer` writes the scripts |
-| `.data/scripts` with `#!python` | delegated | `pypa/installer` rewrites the shebang |
+| Entry points: `console_scripts`, `gui_scripts` | delegated | `pypa/installer` writes the scripts. `projects/wheel-features` |
+| `.data/scripts` with `#!python` | delegated | `pypa/installer` rewrites the shebang. `projects/wheel-features` |
 | `.data/purelib`, `.data/platlib` | delegated | `pypa/installer` |
-| `.data/data` and `.data/headers` | **wrong**, nixidae/nixidae#841 | `pypa/installer` writes them under the node's prefix (`share/`, `include/`), and `make-venv.py` merges only `site-packages` and `bin`. A Jupyter kernel spec or a man page is not in the environment |
+| `.data/data` and `.data/headers` | covered, nixidae/nixidae#841 | `pypa/installer` writes them under the node's prefix (`share/`, `include/`), and `make-venv.py` merges the whole prefix. `projects/wheel-features` |
+| +x on a script that a Windows build wrote | covered | the spec has a Unix installer add it, and `pypa/installer` does not. `make-venv.py:link_script` adds it. `projects/wheel-features` |
 | Shebang rewrite into the environment | covered | `make-venv.py:link_script` |
 | The `/bin/sh` trampoline for a long interpreter path | missing | `is_python_shebang` reads the first line only, so a trampoline keeps the store interpreter. A store path is short, so this is a trap, not a fault today |
-| PEP 420 namespace packages across distributions | covered | `make-venv.py:link_tree` merges directories |
-| `.pth` files | covered | linked into `site-packages`; `build-local.py` rewrites an editable one |
+| PEP 420 namespace packages across distributions | covered | `make-venv.py:link_tree` merges directories. `projects/wheel-features` |
+| `.pth` files | covered | linked into `site-packages`; `build-local.py` rewrites an editable one. `projects/wheel-features` runs an `import` line |
 | Two distributions that ship one file | covered | `make-venv.py:Owners`, a fixed rule and a warning |
 | PEP 610 `direct_url.json`, `INSTALLER`, `REQUESTED` | delegated | what `pypa/installer` writes |
 

@@ -1,0 +1,54 @@
+version = 1
+revision = 5
+requires-python = ">=3.13"
+
+[[package]]
+name = "datafull"
+version = "1.0.0"
+source = { registry = "index" }
+wheels = [
+    { path = "datafull-1.0.0-py3-none-any.whl" },
+]
+
+[[package]]
+name = "nsone"
+version = "1.0.0"
+source = { registry = "index" }
+wheels = [
+    { path = "nsone-1.0.0-py3-none-any.whl" },
+]
+
+[[package]]
+name = "nstwo"
+version = "1.0.0"
+source = { registry = "index" }
+wheels = [
+    { path = "nstwo-1.0.0-py3-none-any.whl" },
+]
+
+[[package]]
+name = "pthful"
+version = "1.0.0"
+source = { registry = "index" }
+wheels = [
+    { path = "pthful-1.0.0-py3-none-any.whl" },
+]
+
+[[package]]
+name = "wheel-features"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "datafull" },
+    { name = "nsone" },
+    { name = "nstwo" },
+    { name = "pthful" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "datafull", specifier = ">=1.0.0" },
+    { name = "nsone", specifier = ">=1.0.0" },
+    { name = "nstwo", specifier = ">=1.0.0" },
+    { name = "pthful", specifier = ">=1.0.0" },
+]

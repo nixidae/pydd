@@ -10,7 +10,10 @@ small version of the same idea:
 - `venv.EnvBuilder` makes a real virtual environment, so the result has
   `pyvenv.cfg`, `bin/python` and `bin/activate`, and an interpreter that finds
   its own `site-packages` with no `PYTHONPATH`.
-- Each top-level entry of the `site-packages` of a member becomes one symlink.
+- Each entry of a member's prefix becomes one symlink, merged by directory:
+  `site-packages`, and also the `share/` and `include/` that a wheel's
+  `.data/data` and `.data/headers` install to. A Jupyter kernel spec lives
+  in `share/`, so an environment of `site-packages` alone loses it.
 - **A console script gets its shebang rewritten**, from the interpreter that
   installed it to the `bin/python` of this environment. Without that rewrite
   the script runs the interpreter of the store path, which does not see the
@@ -168,7 +171,9 @@ def link_script(source: Path, target: Path, venv_python: bytes) -> None:
             with target.open("wb") as out:
                 out.write(b"#!" + venv_python + b"\n")
                 shutil.copyfileobj(handle, out)
-            target.chmod(source.stat().st_mode)
+            # The binary distribution format: a Unix installer adds +x to a
+            # script that a Windows build wrote, and `installer` does not.
+            target.chmod(source.stat().st_mode | 0o111)
             return
 
     target.symlink_to(source)
@@ -191,10 +196,9 @@ def main() -> int:
     owners = Owners()
 
     for member in members:
-        member_site = site_packages_of(member)
-        if member_site.is_dir():
-            for entry in sorted(member_site.iterdir()):
-                link_tree(entry, site / entry.name, member, owners)
+        for entry in sorted(member.iterdir()):
+            if entry.name not in {"bin", "nix-support"}:
+                link_tree(entry, out / entry.name, member, owners)
 
         member_bin = member / "bin"
         if member_bin.is_dir():

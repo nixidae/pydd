@@ -101,6 +101,7 @@ let
     git-app = check ./check-git.nix { };
     vendored-app = check ./check-vendored.nix { };
     local-index = check ./check-index.nix { };
+    wheel-features = check ./check-wheel-features.nix { };
   };
   # Every planner here runs on the same interpreter and the same `nix`.
   inherit (pydd.python.uv { project = ./pure-app; }) closure;
