@@ -17,6 +17,30 @@ rec {
     in
     if found == [ ] then drv else drv.${builtins.head found};
 
+  # **stdenv follows propagated inputs to the end, and a node must too.**
+  # gtk3 propagates pango, cairo and gdk-pixbuf, and they propagate glib.
+  # `gdk-3.0.pc` requires their `.pc` files, so with gtk3 alone pkg-config
+  # reports `gdk-3.0` as missing. This is stdenv's `findInputs`, as a list.
+  withPropagated =
+    drvs:
+    let
+      propagated =
+        drv:
+        builtins.filter (input: lib.isDerivation input && !(isHook input)) (
+          lib.flatten (drv.propagatedBuildInputs or [ ] ++ drv.propagatedNativeBuildInputs or [ ])
+        );
+      item = drv: {
+        key = drv.outPath;
+        inherit drv;
+      };
+    in
+    map (entry: entry.drv) (
+      builtins.genericClosure {
+        startSet = map item drvs;
+        operator = entry: map item (propagated entry.drv);
+      }
+    );
+
   # Each output that a build reads: headers, libraries and programs.
   outputsOf =
     drv:

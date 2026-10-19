@@ -6,7 +6,7 @@
 # table, so an overlay that changes it changes what pydd builds with.
 { lib, pkgs }:
 let
-  inherit (import ../core/tools.nix { inherit lib; }) isHook outputsOf;
+  inherit (import ../core/tools.nix { inherit lib; }) isHook outputsOf withPropagated;
 
   # The table also holds attributes of `buildRustCrate` itself, such as
   # `extraLinkFlags`. An environment variable is in capitals, as
@@ -42,7 +42,7 @@ let
       );
     in
     {
-      tools = lib.unique (lib.concatMap outputsOf inputs);
+      tools = lib.unique (lib.concatMap outputsOf (withPropagated inputs));
       env = envOf attrs;
     };
 
