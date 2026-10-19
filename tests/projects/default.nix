@@ -126,6 +126,13 @@ let
       probe = "platformprobe.PLATFORM";
       expected = "manylinux_2_40";
     };
+    # The backend asks for `hookprobe-extra` only through
+    # `get_requires_for_build_wheel` (nixidae/nixidae#847).
+    hook-requires = check ./check-probe.nix {
+      project = ./hook-probe;
+      probe = "hookprobe_app.HOOK";
+      expected = "extra";
+    };
   };
   # Every planner here runs on the same interpreter and the same `nix`.
   inherit (pydd.python.uv { project = ./pure-app; }) closure;

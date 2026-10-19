@@ -1,0 +1,24 @@
+[project]
+name = "hook-probe"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = ["hookprobe-app>=1.0.0"]
+
+[[tool.uv.index]]
+name = "local"
+url = "index"
+format = "flat"
+default = true
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+
+# uv records no build requirement, so the lock lists the two that a build
+# needs only through this group: the backend's hook asks for the second.
+[dependency-groups]
+build = [
+    "hookprobe-backend>=1.0.0",
+    "hookprobe-extra>=1.0.0",
+    "installer>=1.0.1",
+]

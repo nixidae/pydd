@@ -1,0 +1,59 @@
+version = 1
+revision = 5
+requires-python = ">=3.13"
+
+[[package]]
+name = "hook-probe"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "hookprobe-app" },
+]
+
+[package.dev-dependencies]
+build = [
+    { name = "hookprobe-backend" },
+    { name = "hookprobe-extra" },
+    { name = "installer" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "hookprobe-app", specifier = ">=1.0.0" }]
+
+[package.metadata.requires-dev]
+build = [
+    { name = "hookprobe-backend", specifier = ">=1.0.0" },
+    { name = "hookprobe-extra", specifier = ">=1.0.0" },
+    { name = "installer", specifier = ">=1.0.1" },
+]
+
+[[package]]
+name = "hookprobe-app"
+version = "1.0.0"
+source = { registry = "index" }
+sdist = { path = "hookprobe_app-1.0.0.tar.gz" }
+
+[[package]]
+name = "hookprobe-backend"
+version = "1.0.0"
+source = { registry = "index" }
+wheels = [
+    { path = "hookprobe_backend-1.0.0-py3-none-any.whl" },
+]
+
+[[package]]
+name = "hookprobe-extra"
+version = "1.0.0"
+source = { registry = "index" }
+wheels = [
+    { path = "hookprobe_extra-1.0.0-py3-none-any.whl" },
+]
+
+[[package]]
+name = "installer"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/56/d3/2fab33d15004d41ae8e7b5d3e310510f7f34a7e1dd032a3e60d8b38d8fba/installer-1.1.0.tar.gz", hash = "sha256:5adc0c01ce62d809989e246987cd68944fe5df8af562d0358f65b2ab15cb5de7", size = 481257, upload-time = "2026-10-12T19:35:52.851Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d7/7a/63547a792a12148882205d79e07644091d5b7690f40c2bb9d41452a8bdc2/installer-1.1.0-py3-none-any.whl", hash = "sha256:f55f5728ff61d3dd54dbc5a397cf3f7307cb64b180c20b72afbebf01c9e2c8a0", size = 464466, upload-time = "2026-10-12T19:35:51.096Z" },
+]
