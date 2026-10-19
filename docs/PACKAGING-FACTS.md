@@ -1830,16 +1830,15 @@ Requires-Dist: trove-classifiers
 `hatchling/builders/wheel.py` reads `from editables import EditableProject` in
 `build_editable_detection`, which is the default path of `build_editable`. So a
 PEP 660 build of any hatchling project fails with `ModuleNotFoundError: No
-module named 'editables'` until something adds it. This lab adds it to
-`build-system.requires` of the project.
+module named 'editables'` until something adds it.
 
-**hatchling does declare it, through the hook that this lab does not call.**
-`hatchling/build.py` defines `get_requires_for_build_editable`, and that
-function returns `[*builder.config.dependencies, EDITABLES_REQUIREMENT]`. PEP
-517 and PEP 660 give a backend three such hooks, one for each of `build_sdist`,
-`build_wheel` and `build_editable`, and a frontend calls the hook, resolves
-what comes back, and adds it to the build environment. The next section says
-why this lab cannot, and what it pays instead.
+**hatchling declares it through a hook.** `hatchling/build.py` defines
+`get_requires_for_build_editable`, and that function returns
+`[*builder.config.dependencies, EDITABLES_REQUIREMENT]`. For `packaged-app` the
+answer is `editables~=0.3`. PEP 517 and PEP 660 give a backend three such
+hooks, one for each of `build_sdist`, `build_wheel` and `build_editable`. A
+frontend calls the hook, resolves what comes back, and adds it to the build
+environment. The next section says how pydd calls it.
 
 ### `get_requires_for_build_*` needs a second planner
 
@@ -1852,13 +1851,21 @@ installed there. The node that builds has the backend, but that node has no
 index, no store connection and no way to add a member to a graph that is
 already registered. So one planner cannot take both steps.
 
-**Two planners can, for a source distribution** (nixidae/nixidae#847). The
-host makes both, from one program. The first submits the backend's
+**Two planners can** (nixidae/nixidae#847). The host makes both, from one
+program. The first submits the backend's
 environment, a node whose text names each site. The second takes that output
 as an input, so the backend is built when it runs. It calls the hook with the
 target's interpreter, chooses each answer from the menu, and submits the build.
 `projects/hook-probe` fails in every mode without it, with
 `ModuleNotFoundError: No module named 'hookprobe_extra'`.
+
+**A local project takes the same two planners.** One `backend` planner serves
+every form of the project, because the forms share a path. Each form then asks
+its own hook: `editable` asks `get_requires_for_build_editable`, a tree wheel
+asks `_wheel`, and the archive asks `_sdist`. The wheel out of that archive asks
+`_wheel` of the tree, not of the archive: the archive is the output of another
+planner, and a planner cannot read it. `packaged-app` and `workspace` name no
+`editables`, and fail without the hook with `No module named 'editables'`.
 
 **The hook reads `PATH`, so it runs with the build's tools.** mesonpy answers
 `ninja>=1.8.2` and `patchelf>=0.11.0`, and scikit-build-core answers
@@ -1871,17 +1878,8 @@ but by name. Each archive pays one more planner on its critical path: about
 3.5 s, the step between a one-planner project and a one-sdist project in
 `_generated/measurements.md`.
 
-**A local project still calls no hook.** What it pays instead is one line for
-each such package in the `ddrn` dependency group of the project, and
-`editables` is the one case that a project here has met. What it costs is that nothing checks the list: a backend that
-asks for a package through the hook, and a group that does not name it, fails
-in the build with `ModuleNotFoundError`.
-
-**A dependency group cannot pay it for a git source, and `hatchling` is that
-case.** The group works because the `[build-system]` of the consumer project
-names the backend, and the edges of `uv.lock` then expand it. A git source
-brings its own `[build-system]`, out of the checkout, and `hatchling` writes
-this one:
+**A git source of `hatchling` asks its hook for its whole backend.** Its
+`[build-system]` comes out of the checkout:
 
 ```toml
 [build-system]
@@ -1890,12 +1888,11 @@ build-backend = 'hatchling.ouroboros'
 backend-path = ['src']
 ```
 
-`requires` is empty and it is not honest. `hatchling/ouroboros.py` reads the
-`dependencies` list out of its own `pyproject.toml` with a regular expression,
-and returns it from `get_requires_for_build_wheel`. That list is `packaging`,
-`pathspec`, `pluggy` and `trove-classifiers`, and `hatchling` imports all four.
-So the plan holds no backend node, nothing puts those four on the path, and the
-import of the backend fails.
+`hatchling/ouroboros.py` reads the `dependencies` list out of its own
+`pyproject.toml` with a regular expression, and returns it from
+`get_requires_for_build_wheel`. That list is `packaging`, `pathspec`, `pluggy`
+and `trove-classifiers`, and `hatchling` imports all four. pydd calls that hook
+for a tree wheel, but no fixture builds this case yet.
 
 `flit_core` has the same in-tree shape with an honest empty `requires`, because
 it declares `dependencies = []`. `projects/git-app` therefore takes `flit_core`

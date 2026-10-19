@@ -46,7 +46,7 @@ time on another machine. Each one has an issue.
 | PEP 660 `build_editable` | covered | `build-local.py`, `projects/workspace` |
 | `backend-path` (in-tree backend) | covered | `build-local.py:in_tree_path`, refuses a path that leaves the tree |
 | `config_settings` | covered | override key `config-settings` |
-| `get_requires_for_build_*` | sdists covered, local projects missing, nixidae/nixidae#847 | each sdist takes two planners: one submits the backend's environment, and the other takes it built, calls `get_requires_for_build_wheel` and adds the answer to the path. The answer must be in the lock or in pydd's build systems. A local project calls no hook, and `EDITABLE_REQUIRES` is a fixed table of one backend. `projects/hook-probe` |
+| `get_requires_for_build_*` | covered, nixidae/nixidae#847 | each sdist and each local project takes two planners: one submits the backend's environment, and the other takes it built, calls the hook of its form and adds the answer to the path. The answer must be in the lock or in pydd's build systems. A wheel out of a local project's own archive asks `_wheel` of the tree, because the archive is another planner's output. `projects/hook-probe`, `packaged-app`, `workspace` |
 | `prepare_metadata_for_build_*` | not needed | the lock file holds the metadata |
 
 ## Installing: the wheel format, and the environment

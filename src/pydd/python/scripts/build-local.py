@@ -14,14 +14,9 @@ forms are the three ways that a project reaches a user:
                checkout is a directory, so no archive stands between the tree
                and the wheel.
 
-**Neither form calls `get_requires_for_build_*`.** PEP 517 lets a backend name
-more requirements at build time, through `get_requires_for_build_sdist`,
-`get_requires_for_build_wheel` and `get_requires_for_build_editable`. A
-frontend calls the hook, resolves what comes back, and adds it to the build
-environment. This lab cannot: the node runs in a sandbox with no index and no
-store, and the path of the backend is what the plan already decided. So the
-`build` dependency group of the project supplies the same packages instead, and
-`projects/README.md` records the one case that this costs.
+**No form calls `get_requires_for_build_*` here.** The node runs in a sandbox
+with no index and no store, so the planner calls the hook before this node
+exists, and `backendPath` already holds the answer (`pydd.python._hook`).
 
 **An editable install is a redirection, and the redirection has to survive the
 store.** A backend that follows PEP 660 writes a wheel that carries no code.

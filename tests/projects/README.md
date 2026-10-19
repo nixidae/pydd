@@ -127,20 +127,17 @@ $ nix run --file . pkgs.uv -- init --lib --package --build-backend hatch \
 $ cd packaged-app
 $ nix run --file . pkgs.uv -- add --no-sync rich
 $ nix run --file . pkgs.uv -- add --no-sync --group build \
-    hatchling editables installer flit-core
+    hatchling installer flit-core
 ```
 
-Then two hand edits to `pyproject.toml`, which `uv` has no command for:
+Then a hand edit to `pyproject.toml`, which `uv` has no command for:
 
 ```toml
-[build-system]
-requires = ["hatchling", "editables"]
-
 [tool.uv]
 no-binary-package = ["mdurl"]
 ```
 
-### Why the `build` group holds four packages
+### Why the `build` group holds three packages
 
 **`uv.lock` records no build system.** The `[build-system]` table of the
 project is not in it, and neither is the build system of any source
@@ -151,7 +148,6 @@ One entry is needed for each backend that any build of this project reaches:
 | package | what needs it |
 | --- | --- |
 | `hatchling` | the `[build-system]` of this project |
-| `editables` | `hatchling`, for a PEP 660 build, undeclared |
 | `flit-core` | the `[build-system]` inside the `mdurl` source distribution |
 | `installer` | every node of the graph, to install a wheel |
 
@@ -159,17 +155,11 @@ One entry is needed for each backend that any build of this project reaches:
 those names, so the group pins the top of each closure and the lock file gives
 the rest. `hatchling` alone expands to six packages.
 
-**`hatchling` needs `editables` and does not say so.** Its
-`build_editable_detection` reads `from editables import EditableProject`, and
-the metadata of hatchling 1.31.0 names `packaging`, `pathspec`, `pluggy` and
-`trove-classifiers` only. So `build-system.requires` names it instead, and
-`tests/test_packaged_app.py` records both halves of that measurement.
-
-hatchling states the same need in one more place, and it is a place that this
-lab does not read: `get_requires_for_build_editable` of `hatchling/build.py`
-returns `editables` beside every other dependency of the build.
-`docs/PACKAGING-FACTS.md` says why no hook of that family runs here, under
-"`get_requires_for_build_*` is the hook that this lab does not call".
+**`hatchling` needs `editables` for a PEP 660 build, and asks for it through
+its hook.** `get_requires_for_build_editable` answers `editables~=0.3`, and
+pydd's own lock of build systems holds it, so this project names it nowhere.
+`docs/PACKAGING-FACTS.md` gives the measurement, under "hatchling needs
+`editables` and declares four other packages".
 
 ### The same project, shipped rather than linked
 
@@ -233,18 +223,12 @@ $ nix run --file . pkgs.uv -- init --lib --package --build-backend hatch \
     --name ws-cli --python 3.13 --vcs none packages/ws-cli
 $ nix run --file . pkgs.uv -- add --no-sync --package ws-cli rich ws-core
 $ nix run --file . pkgs.uv -- add --no-sync --group build \
-    hatchling editables installer
+    hatchling installer
 ```
 
 `uv init` inside the workspace adds each member to
 `[tool.uv.workspace] members` of the root, and `uv add --package ws-cli ws-core`
-writes `[tool.uv.sources] ws-core = { workspace = true }`. Then the same hand
-edit as `packaged-app`, to the `pyproject.toml` of **each member**:
-
-```toml
-[build-system]
-requires = ["hatchling", "editables"]
-```
+writes `[tool.uv.sources] ws-core = { workspace = true }`.
 
 `ws-cli` also gets a `[project.scripts]` entry, and each `src/` module is hand
 written.
@@ -454,9 +438,8 @@ nothing has to be installed before this build. `scripts/build-local.py` reads
 project uses `flit_core` instead. `pypa/hatch` holds `hatchling` in `backend`,
 and its `[build-system]` also says `requires = []` with an in-tree backend. But
 that backend is `hatchling.ouroboros`, which reads the real list out of its own
-`pyproject.toml` and returns it from `get_requires_for_build_wheel`. This lab
-calls no hook of that family, and `docs/PACKAGING-FACTS.md` says why, so those
-four packages never reach the path and the import of the backend fails.
+`pyproject.toml` and returns it from `get_requires_for_build_wheel`. pydd calls
+that hook, but no fixture builds this case, so `git-app` keeps `flit_core`.
 
 `tests/fixtures/locks/git-subdirectory.lock` and `url-subdirectory.lock` still
 name `hatchling`, because uv wrote them and they are the record of the shape.

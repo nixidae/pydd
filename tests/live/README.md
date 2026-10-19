@@ -34,7 +34,7 @@ one project.
 | httptools had C, and nothing gave it a compiler | a source with C, C++, Cython or Fortran gets the default compiler |
 | pillow's manylinux wheel needs `libz.so.1` | auto-patchelf searches every library PEP 599 lets a wheel assume |
 | pdm-backend writes into the project's top directory | the copy of the tree is writable at its top too |
-| hatchling's editable build needs `editables` | `EDITABLE_REQUIRES`, what a backend's editable hook adds |
+| hatchling's editable build needs `editables` | the planner calls `get_requires_for_build_editable` (nixidae/nixidae#847) |
 | uv-dynamic-versioning reads git, and a store path has none | the locked version, or `0.0.0`, through each plugin's variable |
 | fastmcp's root installs no code, so nothing redirects | an editable of no code is not an error |
 | setuptools writes an import finder with the build path | the tokenizer rewrites each string literal that names it |
