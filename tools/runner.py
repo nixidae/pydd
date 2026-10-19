@@ -247,6 +247,11 @@ async def test(arguments: argparse.Namespace) -> int:
     modes = {mode for group in GROUPS[arguments.set].values() for mode in group}
     if not arguments.keep_store:
         await collect((lanes()[MODES[mode]] for mode in modes), cache / "pydd")
+    # **One process creates each store, before the jobs.** Parallel first
+    # opens of a new store raced on its schema, and `nix eval` failed with
+    # "database is busy" in the first mode of a project.
+    for lane in {lane.store: lane for lane in (lanes()[MODES[mode]] for mode in modes)}.values():
+        await lane.nix_run(["store", "info", "--store", str(lane.store)], 300, sys.stderr)
     test_set = TestSet(
         arguments.set,
         log,
