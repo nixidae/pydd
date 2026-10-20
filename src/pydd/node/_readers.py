@@ -293,7 +293,12 @@ def read_pnpm(directory: str, data: dict[str, Any]) -> tuple[Graph, set[str]]:
                 )
         versions[key] = Version(
             name=name,
-            version=peel(ref),
+            # A directory has no version in the lock, and its key names the directory.
+            version=(
+                manifest(directory, meta["resolution"]["directory"]).get("version", "0")
+                if meta["resolution"].get("type") == "directory"
+                else peel(ref)
+            ),
             resolved=pnpm_resolved(name, peel(ref), meta["resolution"]),
             integrity=meta["resolution"].get("integrity"),
             dependencies={dep: ref for dep, ref in (snapshot.get("dependencies") or {}).items()},
