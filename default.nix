@@ -192,11 +192,11 @@ rec {
   };
 
   # A recursive-nix planner, built again after its output is deleted. Uses
-  # the host's daemon, and is in no check: `tools/recursive-gc.py`.
-  test-recursive-gc = pkgs.writeShellApplication {
-    name = "pydd-test-recursive-gc";
+  # the host's daemon, and is in no check: `tools/planner-after-gc.py`.
+  test-planner-after-gc = pkgs.writeShellApplication {
+    name = "pydd-test-planner-after-gc";
     runtimeInputs = [ pkgs.python3 ];
-    text = ''exec python3 ${./tools/recursive-gc.py} "$@"'';
+    text = ''exec python3 ${./tools/planner-after-gc.py} "$@"'';
   };
 
   # A stock release, with recursive-nix: a planner gets a daemon socket.

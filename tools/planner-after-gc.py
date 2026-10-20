@@ -9,7 +9,7 @@ Builds the planner, deletes its output, builds it again, and checks that the
 second build gives the same path with the same bytes. It needs the host's
 daemon, with recursive-nix: no sandbox has a store that keeps realisations.
 
-    nix run --file . test-recursive-gc [-- ATTRIBUTE]
+    nix run --file . test-planner-after-gc [-- ATTRIBUTE]
 """
 
 from __future__ import annotations
