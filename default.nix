@@ -474,6 +474,15 @@ rec {
       };
     };
 
+  # Two revisions of a real npm project: `tests/node-revisions`.
+  node-revisions = import ./tests/node-revisions {
+    inherit pkgs;
+    pydd = pkgs.callPackage ./lib {
+      inherit huggorm nix;
+      writer = "cli";
+    };
+  };
+
   # Real Cargo projects from GitHub, as they are: `tests/rust-live`.
   rust-live =
     lib.genAttrs [ "cli" "huggorm" ] (
