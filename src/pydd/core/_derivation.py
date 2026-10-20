@@ -1,7 +1,8 @@
 """A derivation as data, in the JSON that ``nix derivation add`` reads.
 
-pydd never renders ATerm. Nix parses this JSON, fills in every output path
-it can compute, checks the invariants, and writes the ``.drv`` itself.
+Nix parses this JSON, fills in every output path it can compute, checks the
+invariants, and writes the ``.drv`` itself. pydd renders ATerm in one case
+only, which ``pydd.core._aterm`` names.
 """
 
 from __future__ import annotations

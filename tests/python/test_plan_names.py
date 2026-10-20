@@ -14,12 +14,14 @@ The two build different store paths, so each one needs its own name.
 
 from __future__ import annotations
 
+import posixpath
 import re
 from pathlib import Path
 
 import pytest
 
-from pydd.core import CliWriter, RecursiveWriter, writer_from_environ
+from pydd.core import CliWriter, Derivation, RecursiveWriter, writer_from_environ
+from pydd.core._aterm import aterm, drv_path
 from pydd.python import Artifact, Plan
 
 
@@ -104,3 +106,23 @@ class TestAPlannerRunsInsideABuildOnly:
         monkeypatch.setenv("out", str(tmp_path / "out"))
         RecursiveWriter(CliWriter()).submit(str(root), "out")
         assert (tmp_path / "out").read_text() == "Derive([])"
+
+    def test_a_root_at_out_is_written_and_not_added(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        # **Nix keeps a realisation after a GC deletes the planner's output**,
+        # and then builds with `$out` at that old path: the root's own `.drv`.
+        # Added through the daemon, the root sits read-only at `$out`, and Nix
+        # rejects an output the build did not write.
+        class Refusing:
+            def add(self, drv: Derivation) -> str:
+                raise AssertionError(f"{drv.name} went to the daemon")
+
+            def submit(self, path: str, output: str) -> None:
+                raise AssertionError("unused")
+
+        root = Derivation(name="demo", system="x86_64-linux", builder="/bin/sh")
+        out = tmp_path / posixpath.basename(drv_path(root, str(tmp_path)))
+        monkeypatch.setenv("NIX_STORE", str(tmp_path))
+        monkeypatch.setenv("out", str(out))
+        writer = RecursiveWriter(Refusing())
+        writer.submit(writer.add(root), "out")
+        assert out.read_text() == aterm(root, str(tmp_path))
