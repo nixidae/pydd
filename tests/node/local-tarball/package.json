@@ -1,0 +1,11 @@
+{
+  "name": "local-tarball",
+  "version": "0.1.0",
+  "description": "A dependency from a tarball inside the project.",
+  "bin": {
+    "local-tarball": "index.js"
+  },
+  "dependencies": {
+    "greet": "file:vendor/greet-1.0.0.tgz"
+  }
+}

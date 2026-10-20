@@ -40,11 +40,21 @@ class KeepingWriter:
 
     def add(self, drv: Derivation) -> str:
         self.added.append(drv)
-        digest = hashlib.sha256(json.dumps(drv.to_json(), sort_keys=True).encode()).digest()
+        spec = json.loads(drv.env.get("PYDD_NPM", "{}"))
+        # Nix resolves a floating input to its output, whose path follows the
+        # content. A copy out of the project stands for that output here.
+        text = copied(Path(spec["path"])) if spec.get("action") == "copy" else json.dumps(drv.to_json(), sort_keys=True)
+        digest = hashlib.sha256(text.encode()).digest()
         return f"/nix/store/{nix32(digest)[:32]}-{drv.name}.drv"
 
     def submit(self, path: str, output: str) -> None:
         pass
+
+
+def copied(path: Path) -> str:
+    """The content of a file or a directory, as text."""
+    files = sorted(path.rglob("*")) if path.is_dir() else [path]
+    return json.dumps({str(file.relative_to(path)): file.read_bytes().hex() for file in files if file.is_file()})
 
 
 def plan(fixture: str, **changes: Any) -> tuple[KeepingWriter, dict[str, dict[str, Any]]]:
@@ -252,14 +262,16 @@ def test_a_new_revision_of_the_project_rebuilds_only_the_root(project: str, tmp_
     """A package depends on its lock entry, and not on the files beside it. Issue #894.
 
     A derivation that names the project's store path moves with every commit,
-    and every package that depends on it rebuilds with it. The planner reads
-    the project, so each revision is a real copy.
+    and every package that depends on it rebuilds with it. A `file:`
+    dependency's copy names it too, and nothing above the copy moves. The
+    planner reads the project, so each revision is a real copy.
     """
     revisions = [tmp_path / "a", tmp_path / "b"]
     for revision in revisions:
         shutil.copytree(PROJECTS / project, revision)
     before, after = (plan(project, project=str(revision), **NEEDS.get(project, {}))[0] for revision in revisions)
-    assert changed(before, after) == {project}
+    copies = {drv.name for drv in before.added if '"action":"copy"' in drv.env["PYDD_NPM"]}
+    assert changed(before, after) == {project, *copies}
 
 
 def test_a_new_lock_entry_rebuilds_that_package_and_what_runs_it(tmp_path: Path) -> None:

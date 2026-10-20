@@ -1,0 +1,11 @@
+{
+  "name": "local-dir",
+  "version": "0.1.0",
+  "description": "A dependency from a directory inside the project, which pnpm copies.",
+  "bin": {
+    "local-dir": "index.js"
+  },
+  "dependencies": {
+    "greet": "file:modules/greet"
+  }
+}

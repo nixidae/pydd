@@ -340,6 +340,7 @@ class Graph:
         self.lock = lock
         self.nodes: dict[str, Node] = {}
         self.fetches: dict[str, Node] = {}
+        self.copies: dict[str, Node] = {}
         #: The git source of each archive's URL.
         self.git: dict[str, str] = {}
         self.planning: list[str] = []
@@ -437,6 +438,18 @@ class Graph:
         )
         return self.planner.add(drv)
 
+    def copy(self, path: str) -> Node:
+        """A node that copies `path` out of the project, once for each path.
+
+        It runs again for each revision of the project. Its output is content
+        addressed, so Nix resolves a package above it to the derivation it
+        had, and does not build that again. Issue #894.
+        """
+        if path not in self.copies:
+            spec = {"action": "copy", "path": path, "srcs": [self.menu.project]}
+            self.copies[path] = self.planner.add(self.derivation(store_name(posixpath.basename(path)), spec, []))
+        return self.copies[path]
+
     def fetch(self, path: str) -> Node:
         entry = self.lock.packages[path]
         url, integrity = entry["resolved"], entry.get("integrity")
@@ -487,8 +500,8 @@ class Graph:
                 f"pydd.node.npm: {path} comes from {resolved}. pydd fetches packages from a "
                 "registry, from GitHub, GitLab or sourcehut, and from the project's own files."
             )
-        local = posixpath.normpath(posixpath.join(self.menu.directory, resolved.removeprefix("file:")))
-        return local, [], [self.menu.project]
+        node = self.copy(posixpath.normpath(posixpath.join(self.menu.directory, resolved.removeprefix("file:"))))
+        return node.output(), [node], []
 
     def package(self, path: str) -> Node:
         if path in self.nodes:

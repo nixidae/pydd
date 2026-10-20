@@ -79,6 +79,21 @@ let
         test "$(hello-npm)" = 'hello from hello-npm semver=70 styles=6/4'
       '';
     };
+    # A package from a tarball inside the project, which a node copies out.
+    local-tarball = {
+      src = ./local-tarball;
+      check = ''
+        test "$(local-tarball)" = 'hello from local-tarball'
+      '';
+    };
+    # A package from a directory inside the project, which pnpm copies.
+    local-dir = {
+      src = ./local-dir;
+      lock = "pnpm";
+      check = ''
+        test "$(local-dir)" = 'hello from local-dir'
+      '';
+    };
     # The npm workspace with pnpm: a member links to the other member.
     pnpm-workspace = {
       src = ./pnpm-workspace;

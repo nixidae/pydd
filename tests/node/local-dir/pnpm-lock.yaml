@@ -1,0 +1,22 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      greet:
+        specifier: file:modules/greet
+        version: file:modules/greet
+
+packages:
+
+  greet@file:modules/greet:
+    resolution: {directory: modules/greet, type: directory}
+
+snapshots:
+
+  greet@file:modules/greet: {}

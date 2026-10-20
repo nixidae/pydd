@@ -411,9 +411,31 @@ let
       }
     else
       {
-        file = normpath "${directory}/${removePrefix "file:" resolved}";
+        file = "${copy (normpath "${directory}/${removePrefix "file:" resolved}")}";
+        srcs = [ ];
+      };
+
+  # `Graph.copy`: a part of the project, as a node of its own.
+  copy =
+    path:
+    derivation {
+      name = store_name (builtins.unsafeDiscardStringContext (last (splitString "/" path)));
+      inherit system;
+      builder = "${menu.python}/bin/python3";
+      args = [
+        "-I"
+        menu.script
+      ];
+      PATH = "${menu.nodejs}/bin";
+      PYDD_NPM = toJSON {
+        action = "copy";
+        inherit path;
         srcs = [ menu.project ];
       };
+      __contentAddressed = true;
+      outputHashMode = "recursive";
+      outputHashAlgo = "sha256";
+    };
 
   directory = if menu.subdir == "." then menu.project else normpath "${menu.project}/${menu.subdir}";
 

@@ -282,6 +282,11 @@ def main() -> None:
     match spec["action"]:
         case "fetch":
             fetch(spec, out)
+        case "copy":
+            if Path(spec["path"]).is_dir():
+                shutil.copytree(spec["path"], out, symlinks=True)
+            else:
+                shutil.copyfile(spec["path"], out)
         case "text":
             out.write_bytes(spec["text"].encode())
         case "archive":
