@@ -7,6 +7,7 @@ the same derivation for each one, or the two paths submit different roots.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,7 @@ from typing import Any
 import pytest
 from test_against_nix import drv_path
 
+from pydd.core import Derivation, nix32
 from pydd.modes.render import Graph
 from pydd.python import OVERRIDE_KEYS
 
@@ -60,4 +62,38 @@ def test_the_oracle_covers_every_kind() -> None:
         "application",
         "planned",
         "backend",
+    }
+
+
+def test_a_new_revision_of_a_local_project_rebuilds_only_what_reads_it() -> None:
+    """An artefact's node depends on its lock entry, and not on a local project. Issue #894.
+
+    uv, poetry and pylock lanes all write this document, and no reader puts
+    the project in an artefact's node. Every local tree moves here at once.
+    """
+
+    def written(document: dict[str, Any]) -> dict[str, str]:
+        drvs: dict[str, str] = {}
+
+        def add(drv: Derivation) -> str:
+            text = json.dumps(drv.to_json(), sort_keys=True)
+            drvs[drv.name] = text
+            return f"/nix/store/{nix32(hashlib.sha256(text.encode()).digest())[:32]}-{drv.name}.drv"
+
+        Graph(document, add, "/nix/store").root()
+        return drvs
+
+    moved = [
+        node | {"source": node["source"].replace("-tree", "-tree-b")} if "source" in node else node
+        for node in ORACLE["document"]["nodes"]
+    ]
+    before = written(ORACLE["document"])
+    after = written(ORACLE["document"] | {"nodes": moved})
+    assert {name for name, text in before.items() if after.get(name) != text} == {
+        "app-editable",
+        "git-from-tree",
+        "lib-sdist",
+        "lib-from-sdist",
+        "app-env",
+        "app",
     }

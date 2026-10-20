@@ -4,21 +4,34 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from pydd.core import Derivation, Fixed, Planner, fixed_output_path, nix32
+from pydd.node import _readers
 from pydd.node._npm import Graph, Lock, Menu, bin_links, fits, hosted_archive, strongest
 
 PROJECTS = Path(__file__).parent / "node"
 STORE = "/nix/store/00000000000000000000000000000000"
+LOCKFILES = ("package-lock.json", "pnpm-lock.yaml", "yarn.lock", "bun.lock")
+#: What a fixture needs in its menu to plan at all.
+NEEDS = {"git-dep": {"hashes": {"isarray-2.0.5": "sha256-pGqpNBCt0CJ97Rvkg7XRNtCvByBNWTKXVle0zj4byZg="}}}
+
+
+def lockfile(project: str) -> str:
+    return next(name for name in LOCKFILES if (PROJECTS / project / name).is_file())
 
 
 def lock(project: str, system: str = "x86_64-linux", omit: list[str] | None = None) -> Lock:
-    data = json.loads((PROJECTS / project / "package-lock.json").read_text())
-    return Lock.read(data, system, "glibc", ["dev"] if omit is None else omit)
+    omit = ["dev"] if omit is None else omit
+    name = lockfile(project)
+    if name != "package-lock.json":
+        return Lock(_readers.read(str(PROJECTS / project), name), system, "glibc", omit)
+    data = json.loads((PROJECTS / project / name).read_text())
+    return Lock.read(data, system, "glibc", omit)
 
 
 class KeepingWriter:
@@ -34,12 +47,12 @@ class KeepingWriter:
         pass
 
 
-def plan(project: str, **changes: Any) -> tuple[KeepingWriter, dict[str, dict[str, Any]]]:
+def plan(fixture: str, **changes: Any) -> tuple[KeepingWriter, dict[str, dict[str, Any]]]:
     writer = KeepingWriter()
     planner = Planner(writer, "x86_64-linux", None)
     fields: dict[str, Any] = {
-        "name": project,
-        "project": f"{STORE}-{project}-source",
+        "name": fixture,
+        "project": f"{STORE}-{fixture}-source",
         "subdir": ".",
         "nodejs": f"{STORE}-nodejs",
         "python": f"{STORE}-python3",
@@ -49,9 +62,10 @@ def plan(project: str, **changes: Any) -> tuple[KeepingWriter, dict[str, dict[st
         "native": {},
         "omit": ["dev"],
         "scripts": ["build"],
+        "lockfile": lockfile(fixture),
     }
     menu = Menu(**(fields | changes))
-    Graph(planner, menu, lock(project)).root(menu.scripts)
+    Graph(planner, menu, lock(fixture)).root(menu.scripts)
     return writer, {drv.name: json.loads(drv.env["PYDD_NPM"]) for drv in writer.added}
 
 
@@ -225,3 +239,35 @@ def test_a_git_dependency_and_a_replaced_source() -> None:
 def test_a_git_dependency_needs_its_hash() -> None:
     with pytest.raises(SystemExit, match=r"isarray-2\.0\.5"):
         plan("git-dep")
+
+
+def changed(before: KeepingWriter, after: KeepingWriter) -> set[str]:
+    """The names of the derivations of `before` that `after` does not make as they are."""
+    made = {json.dumps(drv.to_json(), sort_keys=True) for drv in after.added}
+    return {drv.name for drv in before.added if json.dumps(drv.to_json(), sort_keys=True) not in made}
+
+
+@pytest.mark.parametrize("project", sorted(path.name for path in PROJECTS.iterdir() if path.is_dir()))
+def test_a_new_revision_of_the_project_rebuilds_only_the_root(project: str, tmp_path: Path) -> None:
+    """A package depends on its lock entry, and not on the files beside it. Issue #894.
+
+    A derivation that names the project's store path moves with every commit,
+    and every package that depends on it rebuilds with it. The planner reads
+    the project, so each revision is a real copy.
+    """
+    revisions = [tmp_path / "a", tmp_path / "b"]
+    for revision in revisions:
+        shutil.copytree(PROJECTS / project, revision)
+    before, after = (plan(project, project=str(revision), **NEEDS.get(project, {}))[0] for revision in revisions)
+    assert changed(before, after) == {project}
+
+
+def test_a_new_lock_entry_rebuilds_that_package_and_what_runs_it(tmp_path: Path) -> None:
+    """bindings gets a new hash. better-sqlite3's install script requires it, and the root holds both."""
+    shutil.copytree(PROJECTS / "native-npm", tmp_path, dirs_exist_ok=True)
+    data = json.loads((tmp_path / "package-lock.json").read_text())
+    data["packages"]["node_modules/bindings"]["integrity"] = "sha512-" + "A" * 86 + "=="
+    (tmp_path / "package-lock.json").write_text(json.dumps(data))
+    before, _ = plan("native-npm")
+    after, _ = plan(str(tmp_path), name="native-npm", project=f"{STORE}-native-npm-source")
+    assert changed(before, after) == {"bindings-1.5.0.tgz", "bindings-1.5.0", "better-sqlite3-11.10.0", "native-npm"}

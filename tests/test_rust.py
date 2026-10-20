@@ -67,8 +67,12 @@ def plan(**changes: Any) -> tuple[KeepingWriter, dict[str, dict[str, Any]]]:
     """Plan serde-app, and give each node's spec by node name."""
     writer = KeepingWriter()
     planner = Planner(writer, "x86_64-linux", None)
-    graph = json.loads((FIXTURES / "serde-app.unit-graph.json").read_text())
-    metadata = json.loads((FIXTURES / "serde-app.metadata.json").read_text())
+    # cargo names the project where the menu has it.
+    project = menu(**changes).project
+    graph, metadata = (
+        json.loads((FIXTURES / f"serde-app.{kind}.json").read_text().replace(menu().project, project))
+        for kind in ("unit-graph", "metadata")
+    )
     planner.submit(Graph(planner, menu(**changes), graph, metadata).root())
     return writer, {drv.name: json.loads(drv.env["PYDD_UNIT"]) for drv in writer.added}
 
@@ -154,6 +158,16 @@ def test_metadata_holds_no_path_of_the_host() -> None:
     _, here = plan()
     _, elsewhere = plan(project="/nix/store/11111111111111111111111111111111-serde-app-source")
     assert metadata(here) == metadata(elsewhere)
+
+
+def test_a_new_revision_of_the_project_rebuilds_only_its_own_units() -> None:
+    """A crate of the vendor directory depends on its lock entry, and not on the project. Issue #894."""
+    here, _ = plan()
+    elsewhere, _ = plan(project="/nix/store/11111111111111111111111111111111-serde-app-source")
+    made = {json.dumps(drv.to_json(), sort_keys=True) for drv in elsewhere.added}
+    changed = [drv.name for drv in here.added if json.dumps(drv.to_json(), sort_keys=True) not in made]
+    # The binary and the root, which share the project's name.
+    assert changed == ["serde-app", "serde-app"]
 
 
 @pytest.mark.parametrize(
