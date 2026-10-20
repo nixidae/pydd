@@ -282,6 +282,8 @@ def main() -> None:
     match spec["action"]:
         case "fetch":
             fetch(spec, out)
+        case "text":
+            out.write_bytes(spec["text"].encode())
         case "archive":
             fetch(spec, top / "archive")
             unpack(str(top / "archive"), out)

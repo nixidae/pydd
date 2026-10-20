@@ -1,0 +1,19 @@
+{
+  "name": "hello-npm",
+  "version": "0.1.0",
+  "description": "pnpm-hello with semver's major patched by `pnpm patch`.",
+  "type": "module",
+  "bin": {
+    "hello-npm": "bin/hello-npm.js"
+  },
+  "dependencies": {
+    "ansi-styles": "^6.2.1",
+    "chalk": "^4.1.2",
+    "semver": "^7.6.3"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "semver@7.8.5": "patches/semver@7.8.5.patch"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+diff --git a/functions/major.js b/functions/major.js
+index 4283165..0d5b2d1 100644
+--- a/functions/major.js
++++ b/functions/major.js
+@@ -1,5 +1,5 @@
+ 'use strict'
+
+ const SemVer = require('../classes/semver')
+-const major = (a, loose) => new SemVer(a, loose).major
++const major = (a, loose) => new SemVer(a, loose).major * 10
+ module.exports = major

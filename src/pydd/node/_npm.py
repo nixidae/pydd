@@ -14,6 +14,8 @@ copies, and why a node holds no dependency of its own.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import posixpath
 import re
@@ -407,6 +409,34 @@ class Graph:
             self.fetches[url] = self.planner.add(drv)
         return self.fetches[url]
 
+    def text(self, path: str) -> Node:
+        """A node that writes the file at `path`, so its store path follows the bytes alone.
+
+        The planner reads the file, and the node does not name the project.
+        A node that names the project changes with every commit. Issue #894.
+        """
+        with open(path, encoding="utf-8", newline="") as handle:
+            text = handle.read()
+        sri = "sha256-" + base64.b64encode(hashlib.sha256(text.encode()).digest()).decode()
+        menu = self.menu
+        srcs, drvs = self.references({menu.python, menu.script}, [])
+        drv = Derivation(
+            name=store_name(posixpath.basename(path)),
+            system=self.planner.system,
+            builder=f"{menu.python}/bin/python3",
+            args=["-I", menu.script],
+            env={
+                "PYDD_NPM": dump({"action": "text", "text": text}),
+                "passAsFile": "PYDD_NPM",
+                "outputHash": sri,
+                "outputHashMode": "flat",
+            },
+            srcs=srcs,
+            drvs=drvs,
+            outputs={"out": Fixed(sri)},
+        )
+        return self.planner.add(drv)
+
     def fetch(self, path: str) -> Node:
         entry = self.lock.packages[path]
         url, integrity = entry["resolved"], entry.get("integrity")
@@ -508,8 +538,9 @@ class Graph:
         if entry.get("hasBin") and "bin" not in entry:
             spec["bins"] = None
         if patch is not None:
-            spec["patch"] = posixpath.join(self.menu.directory, patch)
-            spec["srcs"] = sorted({*srcs, self.menu.project})
+            patched = self.text(posixpath.join(self.menu.directory, patch))
+            spec["patch"] = patched.output()
+            inputs.append(patched)
         # A patched node runs `patch`, one of the script tools.
         drv = self.derivation(
             f"{store_name(name)}-{entry.get('version', '0')}", spec, inputs, name, scripted or patch is not None

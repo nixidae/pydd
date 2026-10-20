@@ -71,6 +71,14 @@ let
         test "$(readlink "$modules/.bin/semver")" = ../semver/bin/semver.js
       '';
     };
+    # pnpm-hello with `pnpm patch` on semver: its major is ten times larger.
+    pnpm-patch = {
+      src = ./pnpm-patch;
+      lock = "pnpm";
+      check = ''
+        test "$(hello-npm)" = 'hello from hello-npm semver=70 styles=6/4'
+      '';
+    };
     # The npm workspace with pnpm: a member links to the other member.
     pnpm-workspace = {
       src = ./pnpm-workspace;
