@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +46,18 @@ def test_a_nested_version_stays_under_its_dependent() -> None:
     packages = read(str(PROJECTS / "pnpm-hello"), "pnpm-lock.yaml")
     assert packages["node_modules/ansi-styles"]["version"] == "6.2.3"
     assert packages["node_modules/chalk/node_modules/ansi-styles"]["version"] == "4.3.0"
+
+
+def test_pnpm_lock_after_the_env_document(tmp_path: Path) -> None:
+    project = PROJECTS / "pnpm-hello"
+    shutil.copytree(project, tmp_path, dirs_exist_ok=True)
+    env = (
+        "---\nlockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    configDependencies: {}\n"
+        "    packageManagerDependencies:\n      pnpm:\n        specifier: 11.0.0\n        version: 11.0.0\n\n"
+    )
+    lock = tmp_path / "pnpm-lock.yaml"
+    lock.write_text(env + "---\n" + lock.read_text())
+    assert read(str(tmp_path), "pnpm-lock.yaml") == read(str(project), "pnpm-lock.yaml")
 
 
 def test_pnpm_gives_no_program_names() -> None:

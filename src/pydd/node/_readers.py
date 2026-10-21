@@ -264,7 +264,7 @@ def read_pnpm(directory: str, data: dict[str, Any]) -> tuple[Graph, set[str]]:
     version = str(data.get("lockfileVersion", ""))
     if not version.startswith("9."):
         raise SystemExit(
-            f"pydd.node.npm: pnpm-lock.yaml has version {version}. pydd reads version 9, of pnpm 9 and 10."
+            f"pydd.node.npm: pnpm-lock.yaml has version {version}. pydd reads version 9, of pnpm 9 and later."
         )
     settings: dict[str, Any] = {}
     workspace = Path(directory, "pnpm-workspace.yaml")
@@ -484,7 +484,10 @@ def read(
         case "pnpm-lock.yaml":
             import yaml
 
-            graph, built = read_pnpm(directory, yaml.safe_load(text))
+            # A lock can open with a document that locks pnpm itself
+            # (packageManagerDependencies). The project's lock is the last one.
+            *_, data = yaml.safe_load_all(text)
+            graph, built = read_pnpm(directory, data)
             if members is not None:
                 graph.only(members)
             packages = hoist(graph, directory, built | set(scripts))
