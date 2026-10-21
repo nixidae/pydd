@@ -159,3 +159,12 @@ def test_members_keep_the_members_they_link_to() -> None:
 def test_an_unknown_member_is_refused() -> None:
     with pytest.raises(SystemExit, match="no workspace member apps/nope"):
         read(str(PROJECTS / "pnpm-workspace"), "pnpm-lock.yaml", members=["apps/nope"])
+
+
+def test_an_unknown_bun_lock_version_is_refused(tmp_path: Path) -> None:
+    """The npm and pnpm readers refuse a lock version they do not know; bun did not. nixidae/nixidae#1003."""
+    shutil.copytree(PROJECTS / "bun-native", tmp_path, dirs_exist_ok=True)
+    lock = tmp_path / "bun.lock"
+    lock.write_text(lock.read_text().replace('"lockfileVersion": 1', '"lockfileVersion": 9'))
+    with pytest.raises(SystemExit, match=r"bun\.lock has version 9"):
+        read(str(tmp_path), "bun.lock")

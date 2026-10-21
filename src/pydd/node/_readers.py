@@ -343,9 +343,18 @@ def bun_path(key: str, members: dict[str, str]) -> str:
     return prefix + "/".join(f"node_modules/{name}" for name in names)
 
 
+BUN_LOCK_VERSIONS = (0, 1)
+"""The `bun.lock` versions this reader knows; another one is refused, not misread."""
+
+
 def read_bun(directory: str, text: str) -> tuple[dict[str, dict[str, Any]], set[str]]:
     # bun writes JSON with trailing commas.
     data = json.loads(re.sub(r",(\s*[}\]])", r"\1", text))
+    version = data.get("lockfileVersion")
+    if version not in BUN_LOCK_VERSIONS:
+        raise SystemExit(
+            f"pydd.node.npm: bun.lock has version {version}. pydd reads versions 0 and 1, of bun 1.2 and later."
+        )
     workspaces: dict[str, dict[str, Any]] = data["workspaces"]
     members = {meta["name"]: path for path, meta in workspaces.items() if path}
     packages: dict[str, dict[str, Any]] = {}
