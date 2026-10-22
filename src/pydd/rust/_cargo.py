@@ -143,6 +143,11 @@ def package_env(package: dict[str, Any], manifest_dir: str) -> dict[str, str]:
 LINKED = {"bin", "cdylib", "staticlib", "dylib"}
 
 
+def proc_macro_suffix(host: str) -> str:
+    """The file a proc-macro is: a shared library of the host it runs on."""
+    return ".dylib" if "-apple-" in host else ".so"
+
+
 def lto_flags(unit: dict[str, Any]) -> list[str]:
     """What cargo passes for the profile's `lto`, by the role of the unit.
 
@@ -340,6 +345,11 @@ class Graph:
         # A binary and a build script are written with `-o`, which ignores it.
         if crate_type != "bin" and not testing:
             flags += ["-C", f"extra-filename=-{metadata}"]
+        # Nix rewrites a CA output's own path after the build. On darwin that
+        # breaks the signature ld64 gives the dylib, and macOS kills the rustc
+        # that loads it. An `@rpath` install name holds no such path.
+        if crate_type == "proc-macro" and "-apple-" in self.menu.host:
+            flags += ["-C", f"link-arg=-Wl,-install_name,@rpath/lib{crate_name}-{metadata}.dylib"]
         if unit["platform"] is not None:
             flags += ["--target", unit["platform"]]
             if self.menu.cross:
@@ -389,7 +399,8 @@ class Graph:
             if self.is_build_script(dep["index"]) or self.is_binary(dep["index"]):
                 continue
             dep_crate = dep_unit["target"]["name"].replace("-", "_")
-            suffix = ".so" if dep_unit["target"]["crate_types"][0] == "proc-macro" else ".rlib"
+            proc_macro = dep_unit["target"]["crate_types"][0] == "proc-macro"
+            suffix = proc_macro_suffix(self.menu.host) if proc_macro else ".rlib"
             path = f"{self.nodes[dep['index']].output()}/lib/lib{dep_crate}-{self.metadata(dep['index'])}{suffix}"
             externs.append({"name": dep["extern_crate_name"], "path": path})
         return externs
