@@ -1,6 +1,10 @@
 {
   sources ? import ./nix/sources.nix,
-  huggormSet ? import sources.huggorm { inherit sources; },
+  # Another system's derivations build on a builder of it:
+  # `--argstr system aarch64-darwin` on dynhetz reaches the MacBook while
+  # it is registered with pynixd.
+  system ? builtins.currentSystem,
+  huggormSet ? import sources.huggorm { inherit sources system; },
   # huggorm's package set, so the bindings and the planners share one Python.
   pkgs ? huggormSet.pkgs,
 }:
