@@ -129,8 +129,8 @@ class RecursiveWriter:
     def __init__(self, inner: Writer) -> None:
         self.inner = inner
         self.store = os.environ.get("NIX_STORE", "/nix/store")
-        #: The root, when its path is `$out`, which this build must write itself.
-        self.held: Derivation | None = None
+        #: Each derivation `aterm` can write, by path, so `submit` need not read the store.
+        self.added: dict[str, Derivation] = {}
 
     def add(self, drv: Derivation) -> str:
         try:
@@ -138,12 +138,12 @@ class RecursiveWriter:
         except ValueError:
             # A dynamic input or an input-addressed output, which `aterm` does not write.
             return self.inner.add(drv)
+        self.added[ours] = drv
         # **A GC keeps the realisation of a deleted output**, and Nix then
         # builds with `$out` at that path, which is the root's own `.drv`.
         # Added here, the root would sit read-only at `$out`, and Nix rejects
         # an output that the build did not write.
         if ours == os.environ.get("out"):  # noqa: SIM112 - Nix names it `out`
-            self.held = drv
             return ours
         path = self.inner.add(drv)
         if path != ours:
@@ -153,11 +153,13 @@ class RecursiveWriter:
     def submit(self, path: str, output: str) -> None:
         if output != "out":
             raise ValueError(f"a planner on released Nix writes only its output 'out', not {output!r}")
-        if self.held is not None and path == os.environ["out"]:  # noqa: SIM112 - Nix names it `out`
-            with open(path, "w", encoding="utf-8") as sink:
-                sink.write(aterm(self.held, self.store))
+        # The darwin sandbox cannot read a path the build added: Nix fixes its
+        # profile at the start, and mounts added paths only on Linux.
+        if (drv := self.added.get(path)) is not None:
+            with open(os.environ["out"], "w", encoding="utf-8") as sink:  # noqa: SIM112 - Nix names it `out`
+                sink.write(aterm(drv, self.store))
             return
-        # recursive-nix puts each path the build added into its sandbox.
+        # recursive-nix on Linux puts each path the build added into its sandbox.
         with open(path, "rb") as source, open(os.environ["out"], "wb") as sink:  # noqa: SIM112 - Nix names it `out`
             sink.write(source.read())
 
