@@ -17,9 +17,11 @@ let
   # The huggorm lane whose Nix has builder-rpc-v0.
   huggorm = huggormSet.lanes.git.huggorm;
 
-  pydd = pkgs.callPackage ./lib { inherit huggorm nix; };
+  pydd = callLib { inherit huggorm nix; };
 
   inherit (import sources.nixvenv { inherit pkgs; }) nixvenv;
+  # Every instance of the library takes nixvenv, for its planners.
+  callLib = args: pkgs.callPackage ./lib ({ inherit nixvenv; } // args);
 
   # The newest release, for planners that write `$out`. Its huggorm lane
   # renders the ATerm that this Nix parses.
@@ -72,7 +74,7 @@ rec {
     lib.genAttrs (writersOf name) (
       writer:
       pkgs.callPackage ./examples/${name} {
-        pydd = pkgs.callPackage ./lib (
+        pydd = callLib (
           if name == "released" then
             {
               inherit writer;
@@ -286,7 +288,7 @@ rec {
       writer:
       import ./tests/projects {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib {
+        pydd = callLib {
           inherit huggorm nix writer;
           pyddDrv = pydd-drv;
         };
@@ -296,7 +298,7 @@ rec {
       out = (
         import ./tests/projects {
           inherit pkgs;
-          pydd = pkgs.callPackage ./lib {
+          pydd = callLib {
             huggorm = huggormReleased;
             nix = nixReleased;
             writer = "huggorm";
@@ -310,7 +312,7 @@ rec {
       recursive-eval = (
         import ./tests/projects {
           inherit pkgs;
-          pydd = pkgs.callPackage ./lib {
+          pydd = callLib {
             huggorm = huggormReleased;
             nix = nixReleased;
             writer = "cli";
@@ -324,7 +326,7 @@ rec {
       recursive-nixpkgs = (
         import ./tests/projects {
           inherit pkgs;
-          pydd = pkgs.callPackage ./lib {
+          pydd = callLib {
             huggorm = huggormReleased;
             nix = nixReleased;
             writer = "cli";
@@ -340,7 +342,7 @@ rec {
       stdenv = (
         import ./tests/projects {
           inherit pkgs;
-          pydd = pkgs.callPackage ./lib {
+          pydd = callLib {
             inherit huggorm nix;
             writer = "cli";
             plannerStdenv = pkgs;
@@ -351,7 +353,7 @@ rec {
       out-stdenv = (
         import ./tests/projects {
           inherit pkgs;
-          pydd = pkgs.callPackage ./lib {
+          pydd = callLib {
             huggorm = huggormReleased;
             nix = nixReleased;
             writer = "huggorm";
@@ -365,7 +367,7 @@ rec {
       recursive = (
         import ./tests/projects {
           inherit pkgs;
-          pydd = pkgs.callPackage ./lib {
+          pydd = callLib {
             huggorm = huggormReleased;
             nix = nixReleased;
             writer = "cli";
@@ -381,13 +383,13 @@ rec {
       writer:
       import ./tests/live {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib { inherit huggorm nix writer; };
+        pydd = callLib { inherit huggorm nix writer; };
       }
     )
     // {
       out = import ./tests/live {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib {
+        pydd = callLib {
           huggorm = huggormReleased;
           nix = nixReleased;
           writer = "huggorm";
@@ -396,7 +398,7 @@ rec {
       };
       recursive = import ./tests/live {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib {
+        pydd = callLib {
           huggorm = huggormReleased;
           nix = nixReleased;
           writer = "cli";
@@ -414,7 +416,7 @@ rec {
       writer:
       import ./tests/rust {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib {
+        pydd = callLib {
           inherit huggorm nix writer;
           pyddDrv = pydd-drv;
         };
@@ -423,7 +425,7 @@ rec {
     // {
       recursive = import ./tests/rust {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib {
+        pydd = callLib {
           huggorm = huggormReleased;
           nix = nixReleased;
           writer = "cli";
@@ -439,7 +441,7 @@ rec {
       writer:
       import ./tests/node {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib {
+        pydd = callLib {
           inherit huggorm nix writer;
           pyddDrv = pydd-drv;
         };
@@ -448,7 +450,7 @@ rec {
     // {
       recursive = import ./tests/node {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib {
+        pydd = callLib {
           huggorm = huggormReleased;
           nix = nixReleased;
           writer = "cli";
@@ -459,7 +461,7 @@ rec {
       # (`lib/node/graph.nix`), and the planner writes the root.
       out = import ./tests/node {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib {
+        pydd = callLib {
           huggorm = huggormReleased;
           nix = nixReleased;
           writer = "huggorm";
@@ -474,13 +476,13 @@ rec {
       writer:
       import ./tests/node-live {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib { inherit huggorm nix writer; };
+        pydd = callLib { inherit huggorm nix writer; };
       }
     )
     // {
       recursive = import ./tests/node-live {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib {
+        pydd = callLib {
           huggorm = huggormReleased;
           nix = nixReleased;
           writer = "cli";
@@ -491,7 +493,7 @@ rec {
       # (`lib/node/graph.nix`), and the planner writes the root.
       out = import ./tests/node-live {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib {
+        pydd = callLib {
           huggorm = huggormReleased;
           nix = nixReleased;
           writer = "huggorm";
@@ -503,7 +505,7 @@ rec {
   # Two revisions of a real npm project: `tests/node-revisions`.
   node-revisions = import ./tests/node-revisions {
     inherit pkgs;
-    pydd = pkgs.callPackage ./lib {
+    pydd = callLib {
       inherit huggorm nix;
       writer = "cli";
     };
@@ -515,13 +517,13 @@ rec {
       writer:
       import ./tests/rust-live {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib { inherit huggorm nix writer; };
+        pydd = callLib { inherit huggorm nix writer; };
       }
     )
     // {
       recursive = import ./tests/rust-live {
         inherit pkgs;
-        pydd = pkgs.callPackage ./lib {
+        pydd = callLib {
           huggorm = huggormReleased;
           nix = nixReleased;
           writer = "cli";

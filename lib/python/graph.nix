@@ -72,6 +72,13 @@ let
   # finds `sh` on `PATH` and never at `/bin/sh`.
   basePath = "${tool.coreutils}/bin:${tool.unzip}/bin:${tool.gnutar}/bin:${tool.gzip}/bin:${tool.python}/bin:${tool.bash}/bin";
 
+  # A step that runs Python makes its venv with these: the backend's, and
+  # `installer`'s, which runs through `runInstaller`. A node on stdenv
+  # takes them too.
+  venvScripts = {
+    inherit (script) makeVenv runInstaller;
+  };
+
   mk =
     args:
     derivation (
@@ -90,6 +97,7 @@ let
         # node of this graph runs no `stdenv`.
         SOURCE_DATE_EPOCH = "315532800";
       }
+      // venvScripts
       // args
       // floating
     );
@@ -230,6 +238,7 @@ let
         removeAttrs args [ "args" ]
         // overridesOf node
         // floating
+        // venvScripts
         // {
           inherit site python;
           nativeBuildInputs =

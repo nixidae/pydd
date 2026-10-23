@@ -83,6 +83,7 @@ let
     "buildSdist"
     "buildLocal"
     "makeVenv"
+    "runInstaller"
     "makeApplication"
     "fixupElf"
   ] (name: source "script-${name}");

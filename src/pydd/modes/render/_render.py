@@ -154,6 +154,10 @@ class Graph:
     def fetched(artifact: dict[str, Any]) -> Text:
         return artifact["path"] if "path" in artifact else artifact["out"]
 
+    def venv_scripts(self) -> dict[str, Text]:
+        """`venvScripts` of `graph.nix`."""
+        return {name: self.script[name] for name in ("makeVenv", "runInstaller")}
+
     def runs(self, script: str) -> list[Text]:
         return [Text("-c"), cat('exec "', self.python, '" "', self.script[script], '"')]
 
@@ -319,6 +323,7 @@ class Graph:
             "system": self.doc["system"],
             "site": Text(self.site),
             "python": self.python,
+            **self.venv_scripts(),
             "builder": cat(self.tool["bash"], "/bin/bash"),
             "PATH": self.base_path,
             "SOURCE_DATE_EPOCH": Text("315532800"),
@@ -342,6 +347,7 @@ class Graph:
                 "__contentAddressed": True,
                 "outputHashMode": Text("recursive"),
                 "outputHashAlgo": Text("sha256"),
+                **self.venv_scripts(),
                 "site": Text(self.site),
                 "python": self.python,
                 "nativeBuildInputs": [*roots, *stdenv["nativeBuildInputs"], self.tool["python"], self.tool["unzip"]],

@@ -3,7 +3,8 @@
 **The answer exists only once the backend is built**, so the planner that asks
 runs after the backend environment, and takes that environment as an input
 (nixidae/nixidae#847). It runs the target's interpreter, as the build node
-does, in the unpacked project, with the backend's sites on `PYTHONPATH`.
+does, in the unpacked project, in a venv of the backend's nodes that
+`scripts/make-venv.py` makes.
 """
 
 from __future__ import annotations
@@ -17,6 +18,8 @@ import zipfile
 from pathlib import Path
 
 from packaging.requirements import Requirement
+
+MAKE_VENV = Path(__file__).parent / "scripts" / "make-venv.py"
 
 #: Run under the target's interpreter, which may hold no `packaging`, so the
 #: answer travels back as JSON text and is parsed here. `backend-path` goes
@@ -97,10 +100,12 @@ def requires_for_build(
     """
     with tempfile.TemporaryDirectory() as scratch:
         project = writable(source, Path(scratch) / "src") / subdirectory
+        venv = Path(scratch) / "backend"
+        subprocess.run([python, str(MAKE_VENV), str(venv), ":".join(sites)], check=True)
         result = subprocess.run(
-            [python, "-c", HOOK, hook, backend, config_settings or "null"],
+            [str(venv / "bin" / "python"), "-c", HOOK, hook, backend, config_settings or "null"],
             cwd=project,
-            env=(env or {}) | {"PYTHONPATH": ":".join(sites), "PATH": path, "HOME": scratch, "TMPDIR": scratch},
+            env=(env or {}) | {"PATH": f"{venv / 'bin'}:{path}", "HOME": scratch, "TMPDIR": scratch},
             capture_output=True,
             text=True,
             check=False,

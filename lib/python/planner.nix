@@ -433,6 +433,8 @@ let
         (pkgs.lib.fileset.difference (pkgs.lib.fileset.fileFilter (
           file: file.hasExt "py"
         ) ../../src/pydd/python) scriptDir)
+        # `_hook.py` makes the backend's venv with it.
+        (scriptDir + "/make-venv.py")
         ../../src/pydd/modes/__init__.py
         (
           {
@@ -534,6 +536,7 @@ let
     buildSdist = "${scriptDir + "/build-sdist.sh"}";
     buildLocal = "${scriptDir + "/build-local.py"}";
     makeVenv = "${scriptDir + "/make-venv.py"}";
+    runInstaller = "${scriptDir + "/run-installer.py"}";
     makeApplication = "${scriptDir + "/make-application.py"}";
     fixupElf = "${scriptDir + "/fixup-elf.py"}";
   };

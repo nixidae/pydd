@@ -16,6 +16,7 @@
   callPackage,
   huggorm,
   nix,
+  nixvenv,
   pyddDrv ? null,
   writer ? "cli",
   plannerProtocol ? "rpc",
@@ -31,7 +32,7 @@
   plannerStdenv ? null,
 }:
 let
-  planner = callPackage ./core/planner.nix { };
+  planner = callPackage ./core/planner.nix { inherit nixvenv; };
   self = planner // {
     inherit writer pyddDrv;
     nixpkgs = plannerNixpkgs;

@@ -47,8 +47,11 @@ The environment gives:
     subdirectory   where the project lives inside `source`, or empty
     editableRoot   the path to redirect to, in `editable` mode only
     backend        the PEP 517 backend, as `module` or `module:attribute`
-    backendPath    PYTHONPATH for the backend, from the nodes that built it
-    installerPath  PYTHONPATH for `installer`, in every mode but `sdist`
+    backendPath    the `site-packages` of the nodes that built the backend
+    installerPath  the `site-packages` of `installer`, in every mode but `sdist`
+    makeVenv       `make-venv.py`, which makes a venv of either
+    runInstaller   `run-installer.py`, which runs `installer` in its venv
+    python         the interpreter that this node builds for
     out            the output path
 
 and, from a node override (`graph.nix` at `overridesOf`), any of `patches`,
@@ -66,6 +69,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import tokenize
 import tomllib
 from pathlib import Path
@@ -291,11 +295,15 @@ def install(wheel: Path, out: Path, installer_path: str) -> None:
     The same installer, and the same command, that a node of the graph runs
     for a wheel of the index. An editable wheel is a wheel, and PEP 376 does
     not treat it apart.
+
+    `installer` runs in a venv of its own node, and `run-installer.py` gives
+    each console script the interpreter of the node, not that of the venv.
     """
+    venv = Path(tempfile.mkdtemp(prefix="installer-"))
+    subprocess.run([env("python"), env("makeVenv"), str(venv), installer_path], check=True)
     subprocess.run(
-        [sys.executable, "-m", "installer", "--prefix", str(out), str(wheel)],
+        [str(venv / "bin" / "python"), env("runInstaller"), env("python"), "--prefix", str(out), str(wheel)],
         check=True,
-        env={**os.environ, "PYTHONPATH": installer_path},
     )
 
 
@@ -374,14 +382,31 @@ def build_sdist(project: Path, out: Path, backend_name: str) -> None:
     print(f"sdist: {backend_name} wrote {archive}, {size} bytes", file=sys.stderr)
 
 
+def enter_backend_venv() -> None:
+    """Run this script again, in a venv of the nodes that built the backend.
+
+    **A frontend gives the build environment to what the backend runs**, as
+    pip and `build` do: meson runs `cython` as a program. In the venv,
+    `sys.executable` and each script in `bin` find the backend's packages.
+    """
+    if "pyddBackendVenv" in os.environ:
+        return
+    venv = Path(tempfile.mkdtemp(prefix="backend-"))
+    subprocess.run([sys.executable, env("makeVenv"), str(venv), os.environ.get("backendPath", "")], check=True)
+    os.environ["pyddBackendVenv"] = str(venv)
+    os.environ["PATH"] = f"{venv / 'bin'}:{os.environ['PATH']}"
+    python = str(venv / "bin" / "python")
+    os.execv(python, [python, *sys.argv])
+
+
 def main() -> int:
     mode = env("mode")
     if mode not in HOOKS:
         raise RuntimeError(f"mode is {mode!r}, and this script builds one of {sorted(HOOKS)}")
+    enter_backend_venv()
 
     out = Path(env("out"))
     backend_name = env("backend")
-    backend_path = os.environ.get("backendPath", "")
     subdirectory = os.environ.get("subdirectory", "")
 
     build_dir = writable_copy(Path(env("source")))
@@ -395,13 +420,7 @@ def main() -> int:
     # **The in-tree paths go first, and PEP 517 says so.** A project that
     # carries its own backend means that one, and not a package of the same
     # name that the plan happened to install.
-    backend_sites = [entry for entry in backend_path.split(":") if entry]
-    sys.path[:0] = in_tree_path(project) + backend_sites
-    # **A frontend gives the build environment to what the backend runs**, as
-    # pip and `build` do: meson runs `cython` as a program.
-    os.environ["PYTHONPATH"] = backend_path
-    scripts = [str(Path(site).parents[2] / "bin") for site in backend_sites]
-    os.environ["PATH"] = ":".join([*scripts, os.environ["PATH"]])
+    sys.path[:0] = in_tree_path(project)
     prepare(project)
 
     if mode == "editable":

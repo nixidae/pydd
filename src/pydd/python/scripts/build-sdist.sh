@@ -12,8 +12,10 @@
 #                  `local-sdist` gives the directory, because the name that
 #                  PEP 625 puts on the archive is not the name of the project.
 #   backend        the PEP 517 backend, as `module.submodule`
-#   backendPath    PYTHONPATH for the backend, from the nodes that built it
-#   installerPath  PYTHONPATH for `installer`, from the node that unpacked it
+#   backendPath    the `site-packages` of the nodes that built the backend
+#   installerPath  the `site-packages` of `installer`
+#   makeVenv       `make-venv.py`, which makes a venv of either
+#   runInstaller   `run-installer.py`, which runs `installer` in its venv
 #   out            the output path
 # and, from a node override (`graph.nix` at `overridesOf`), any of `patches`,
 # `patch`, `preBuild`, `configSettings` and `postInstall`.
@@ -60,21 +62,20 @@ if [ ! -d "$project" ]; then
 fi
 
 cd "$project"
-# **A frontend puts the scripts of the build environment on PATH**, as pip and
-# `build` do. meson runs `cython` as a program, and not as a module.
-IFS=: read -ra backendSites <<<"$backendPath"
-for backendSite in "${backendSites[@]}"; do
-  PATH="${backendSite%/"$site"}/bin:$PATH"
-done
+# **The backend runs in a venv of the nodes that built it, and a frontend puts
+# the scripts of that environment on PATH**, as pip and `build` do. meson runs
+# `cython` as a program, and not as a module.
+"$python" "$makeVenv" "$TMPDIR/backend" "$backendPath"
+PATH="$TMPDIR/backend/bin:$PATH"
 export PATH
 read -ra patchFiles <<<"${patches:-}"
 for patchFile in "${patchFiles[@]}"; do
   "$patch" -p1 -i "$patchFile"
 done
 eval "${preBuild:-}"
-# The backend runs with the built backend nodes on its path, and with nothing
+# The backend runs with the built backend nodes in its venv, and with nothing
 # else. There is no network here, and no index.
-PYTHONPATH="$backendPath" "$python" -c '
+"$TMPDIR/backend/bin/python" -c '
 import importlib
 import json
 import os
@@ -111,8 +112,9 @@ cd "$root"
 
 # The wheel that this node built goes through the same installer as one that
 # the lock file named, so both give the same shape of output.
+"$python" "$makeVenv" "$TMPDIR/installer" "$installerPath"
 for built in "$root"/wheel/*.whl; do
-  PYTHONPATH="$installerPath" "$python" -m installer --prefix "$out" "$built"
+  "$TMPDIR/installer/bin/python" "$runInstaller" "$python" --prefix "$out" "$built"
 done
 
 (cd "$project" && eval "${postInstall:-}")

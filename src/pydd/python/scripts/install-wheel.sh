@@ -17,7 +17,10 @@
 # The environment gives:
 #   wheel          the `.whl` file, which the fetch of the graph produced
 #   wheelName      the name that the index gave that file
-#   installerPath  PYTHONPATH for `installer`, from the node that unpacked it
+#   installerPath  the `site-packages` of `installer`, from the node that
+#                  unpacked it
+#   makeVenv       `make-venv.py`, which makes a venv of it
+#   runInstaller   `run-installer.py`, which runs `installer` in that venv
 #   out            the output path
 #
 # A wheel that carries a binary also gives:
@@ -36,10 +39,12 @@ set -eu
 # directory for the same reason.
 cp "$wheel" "./$wheelName"
 
-# The interpreter that runs the install is the one whose shebang each console
-# script gets. `make-venv.py` rewrites that shebang to the `bin/python` of the
-# environment, which is what makes a script find the packages beside it.
-PYTHONPATH="$installerPath" "$python" -m installer --prefix "$out" "./$wheelName"
+# `installer` runs in a venv of its own node. `run-installer.py` gives each
+# console script the interpreter of the node, and `make-venv.py` rewrites that
+# shebang to the `bin/python` of the final environment, which is what makes a
+# script find the packages beside it.
+"$python" "$makeVenv" "$TMPDIR/installer" "$installerPath"
+"$TMPDIR/installer/bin/python" "$runInstaller" "$python" --prefix "$out" "./$wheelName"
 
 # **A wheel that carries a binary is built for a different Linux.** A manylinux
 # wheel names `/lib64/ld-linux-x86-64.so.2` as its ELF interpreter and gives no

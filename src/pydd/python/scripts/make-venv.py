@@ -27,6 +27,12 @@ The environment gives:
     out        the output path
     members    the output of each node that belongs in the environment
     installed  one `name==version` for each member, one to a line
+
+**A build step runs it too**, as `make-venv.py OUT SITES`, for the
+environment that a backend, `installer` or a build hook runs in. `SITES` is
+the `site-packages` of each node, joined by `:`, as `backendPath` and
+`installerPath` give it. That environment is scratch: it gets no `manifest`,
+and it dies with the build.
 """
 
 from __future__ import annotations
@@ -179,10 +185,8 @@ def link_script(source: Path, target: Path, venv_python: bytes) -> None:
     target.symlink_to(source)
 
 
-def main() -> int:
-    out = Path(os.environ["out"])
-    members = [Path(member) for member in os.environ["members"].split()]
-
+def compose(out: Path, members: list[Path]) -> Path:
+    """Make the environment at `out` from `members`, and give its `site-packages`."""
     # `EnvBuilder` takes the interpreter that runs this script as the base of
     # the environment, which is the interpreter that `graph.nix` names.
     EnvBuilder(symlinks=True, with_pip=False).create(out)
@@ -211,7 +215,18 @@ def main() -> int:
                 else:
                     owners.by_path[target] = member
                 link_script(entry, target, venv_python)
+    return site
 
+
+def main() -> int:
+    if len(sys.argv) > 1:
+        out, sites = Path(sys.argv[1]), sys.argv[2] if len(sys.argv) > 2 else ""
+        compose(out, [Path(site).parents[2] for site in sites.split(":") if site])
+        return 0
+
+    out = Path(os.environ["out"])
+    members = [Path(member) for member in os.environ["members"].split()]
+    site = compose(out, members)
     (out / "manifest").write_text(os.environ["installed"] + "\n", encoding="utf-8")
 
     print(f"{len(members)} members, {len(list(site.iterdir()))} entries in site-packages", file=sys.stderr)

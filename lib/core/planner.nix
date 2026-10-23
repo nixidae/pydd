@@ -4,6 +4,8 @@
   python3,
   nixVersions,
   linkFarmFromDrvs,
+  runCommand,
+  nixvenv,
 }:
 
 let
@@ -25,6 +27,16 @@ let
       root = ../../src;
       fileset = fileset.unions ([ core ] ++ modules);
     };
+
+  # The source as a package, so a venv holds it beside what it imports.
+  pyddPackage =
+    python: modules:
+    python.pkgs.toPythonModule (
+      runCommand "pydd-planner-source" { } ''
+        mkdir -p $out/${python.sitePackages}
+        ln -s ${pyddSrc modules}/pydd $out/${python.sitePackages}/pydd
+      ''
+    );
 in
 {
   /**
@@ -149,6 +161,14 @@ in
       writer == "huggorm" -> huggorm != null
     ) "mkPlanner: writer = \"huggorm\" needs huggorm";
     let
+      # A venv, not PYTHONPATH: `sys.executable` then imports what the plan
+      # imports, in the planner and in what it starts.
+      venv = nixvenv {
+        inherit python;
+        packages =
+          _:
+          [ (pyddPackage python modules) ] ++ lib.optional (writer == "huggorm") huggorm ++ pythonPath;
+      };
       attributes = env // {
         inherit allowImportFromDerivation;
         name = "${name}.drv";
@@ -158,7 +178,7 @@ in
         # builder with only the basename there.
         args = [
           "-c"
-          "exec ${python}/bin/python3 ${plan}"
+          "exec ${venv}/bin/python ${plan}"
         ];
 
         requiredSystemFeatures =
@@ -171,11 +191,6 @@ in
         outputHashAlgo = "sha256";
 
         PATH = lib.makeBinPath [ (if writer == "drv" then pyddDrv else nix) ];
-        PYTHONPATH = lib.concatStringsSep ":" (
-          [ "${pyddSrc modules}" ]
-          ++ lib.optional (writer == "huggorm") (python.pkgs.makePythonPath [ huggorm ])
-          ++ map (package: python.pkgs.makePythonPath [ package ]) pythonPath
-        );
         PYTHONDONTWRITEBYTECODE = "1";
 
         PYDD_WRITER = writer;
@@ -226,11 +241,9 @@ in
           closure = linkFarmFromDrvs "${name}-planner-closure" (
             [
               bash
-              python
+              venv
               (if writer == "drv" then pyddDrv else nix)
             ]
-            ++ lib.optional (writer == "huggorm") huggorm
-            ++ pythonPath
           );
         };
     in

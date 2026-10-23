@@ -5,8 +5,8 @@ and the planner of a source distribution selects the backend that the archive
 asks for. Both make packaging decisions with `packaging`, both write a plan
 document, and both submit its root through `pydd.modes`.
 
-This package is not installed. A planner reaches it through `PYTHONPATH`
-inside its build sandbox, which `default.nix` sets from a store path.
+This package is not installed from an index. A planner runs in a venv that
+holds it as a package of the store (`lib/core/planner.nix`).
 """
 
 from __future__ import annotations
