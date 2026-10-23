@@ -20,6 +20,8 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# pydd has no installed package: its planners read `src/` as it is.
+pythonpath = ["src", "tests"]
 addopts = "-q --strict-markers --strict-config"
 
 [tool.ruff]

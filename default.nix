@@ -19,6 +19,8 @@ let
 
   pydd = pkgs.callPackage ./lib { inherit huggorm nix; };
 
+  inherit (import sources.nixvenv { inherit pkgs; }) nixvenv;
+
   # The newest release, for planners that write `$out`. Its huggorm lane
   # renders the ATerm that this Nix parses.
   nixReleased = pkgs.nixVersions.nix_2_35;
@@ -109,8 +111,11 @@ rec {
         export PYDD_NIX_RELEASED=${lib.getExe nixReleased}
         export PYDD_NIX_RELEASED_VERSION=${nixReleased.version}
         exec ${
-          pkgs.python3.withPackages (ps: [ ps.anyio ])
-        }/bin/python3 ${./tools/runner.py} ${lib.escapeShellArgs arguments} "$@"
+          nixvenv {
+            python = pkgs.python3;
+            packages = ps: [ ps.anyio ];
+          }
+        }/bin/python ${./tools/runner.py} ${lib.escapeShellArgs arguments} "$@"
       '';
     };
 
@@ -147,7 +152,13 @@ rec {
   ciWorkflowFile =
     pkgs.runCommand "pages.yml"
       {
-        nativeBuildInputs = [ (pkgs.python3.withPackages (ps: [ ps.pyyaml ])) ];
+        nativeBuildInputs = [
+          (nixvenv {
+            python = pkgs.python3;
+            packages = ps: [ ps.pyyaml ];
+            executables = [ "python3" ];
+          })
+        ];
         value = builtins.toJSON ciWorkflow;
         passAsFile = [ "value" ];
       }
@@ -163,7 +174,10 @@ rec {
   '';
 
   # The site that GitHub Pages serves: docs/, with Sphinx.
-  pydd-docs = pkgs.python3Packages.callPackage ./nix/docs.nix { inherit (pkgs) graphviz; };
+  pydd-docs = pkgs.python3Packages.callPackage ./nix/docs.nix {
+    inherit (pkgs) graphviz;
+    inherit nixvenv;
+  };
 
   # A derivation that does nothing, with the same nonce: the time Nix needs to
   # build anything at all, which every planner time holds.
@@ -258,7 +272,7 @@ rec {
           fi
           touch $out
         '';
-    tests = pkgs.callPackage ./nix/tests.nix { inherit huggorm pydd-drv; };
+    tests = pkgs.callPackage ./nix/tests.nix { inherit huggorm pydd-drv nixvenv; };
   };
 
   # The uv projects of the ddrn lab, each with its check, once for each

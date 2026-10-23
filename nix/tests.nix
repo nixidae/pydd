@@ -7,6 +7,7 @@
   ruff,
   huggorm,
   pydd-drv,
+  nixvenv,
 }:
 let
   system = "x86_64-linux";
@@ -69,12 +70,16 @@ in
 runCommand "pydd-tests"
   {
     nativeBuildInputs = [
-      (huggorm.pythonModule.withPackages (ps: [
-        ps.pytest
-        ps.packaging
-        ps.pyyaml
-        huggorm
-      ]))
+      (nixvenv {
+        python = huggorm.pythonModule;
+        packages = ps: [
+          ps.pytest
+          ps.packaging
+          ps.pyyaml
+          huggorm
+        ];
+        executables = [ "pytest" ];
+      })
       nixVersions.git
       ruff
     ];
@@ -114,6 +119,6 @@ runCommand "pydd-tests"
     fi
     ruff check --no-cache .
     ruff format --no-cache --check .
-    PYTHONPATH=src:tests pytest -p no:cacheprovider tests
+    pytest -p no:cacheprovider tests
     touch $out
   ''
