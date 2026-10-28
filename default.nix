@@ -57,6 +57,42 @@ let
         "huggorm"
         "drv"
       ];
+
+  # The arguments of each mode's library instance. `cli`, `huggorm` and `drv`
+  # need Nix master (`builder-rpc-v0`); `out` and `recursive` build on the
+  # newest release. docs/modes.md compares them.
+  modeArgs = {
+    cli = {
+      inherit huggorm nix;
+      writer = "cli";
+      pyddDrv = pydd-drv;
+    };
+    huggorm = {
+      inherit huggorm nix;
+      writer = "huggorm";
+      pyddDrv = pydd-drv;
+    };
+    drv = {
+      inherit huggorm nix;
+      writer = "drv";
+      pyddDrv = pydd-drv;
+    };
+    # The planner writes its root as ATerm to `$out`. Any release, no
+    # experimental feature.
+    out = {
+      writer = "drv";
+      huggorm = huggormReleased;
+      nix = nixReleased;
+      pyddDrv = pydd-drv-released;
+      plannerProtocol = "out";
+    };
+    # The planner writes every node through recursive-nix. Any release, with
+    # `ca-derivations`, `dynamic-derivations` and `recursive-nix`.
+    recursive = modeArgs.out // {
+      plannerProtocol = "recursive";
+    };
+  };
+  libraryOf = lib.mapAttrs (_: callLib) modeArgs;
 in
 rec {
   inherit
@@ -74,27 +110,15 @@ rec {
     lib.genAttrs (writersOf name) (
       writer:
       pkgs.callPackage ./examples/${name} {
-        pydd = callLib (
+        pydd =
           if name == "released" then
-            {
+            callLib {
               inherit writer;
               huggorm = huggormReleased;
               nix = nixReleased;
             }
-          else if writer == "released" || writer == "recursive" then
-            {
-              writer = "drv";
-              huggorm = huggormReleased;
-              nix = nixReleased;
-              pyddDrv = pydd-drv-released;
-              plannerProtocol = if writer == "recursive" then "recursive" else "out";
-            }
           else
-            {
-              inherit huggorm nix writer;
-              pyddDrv = pydd-drv;
-            }
-        );
+            libraryOf.${if writer == "released" then "out" else writer};
       }
     )
   ) (lib.filterAttrs (_: type: type == "directory") (builtins.readDir ./examples));
@@ -574,4 +598,22 @@ rec {
     "test"
     "node"
   ];
+}
+// {
+  /**
+    The pydd library, once for each mode: `cli`, `huggorm`, `drv`, `out`
+    and `recursive`. Each one carries its own Nix, huggorm and Python, so a
+    consumer names a mode and nothing else:
+
+    ```nix
+    (import nixidae { }).pydd.lib.recursive.python.uv { project = ./.; }
+    ```
+
+    The first three need Nix master. `out` and `recursive` build on a
+    release; `recursive` needs `recursive-nix` on the builder.
+    docs/modes.md compares them.
+
+    Outside the `rec` set above: there, a `lib` would shadow nixpkgs' `lib`.
+  */
+  lib = libraryOf;
 }

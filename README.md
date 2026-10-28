@@ -24,6 +24,29 @@ it unchanged.
   `plannerProtocol = "out"` (see Python environments).
 - `experimental-features = nix-command ca-derivations dynamic-derivations`.
 
+## Use it from another project
+
+Take pydd from nixidae, and name a mode. Each mode brings its own Nix,
+huggorm and Python, so a consumer passes nothing else:
+
+```nix
+let
+  pydd = (import nixidae { }).pydd.lib.recursive;
+in
+pydd.python.uv {
+  project = ./.;
+  application = "myapp";
+}
+```
+
+| `pydd.lib.<mode>` | Nix | builder needs |
+| --- | --- | --- |
+| `cli`, `huggorm`, `drv` | master | `builder-rpc-v0` |
+| `out` | the newest release | nothing more |
+| `recursive` | the newest release | `recursive-nix` in `system-features` |
+
+`docs/modes.md` compares the modes.
+
 ## Three ways to write a graph
 
 | | writes through | needs | example |
