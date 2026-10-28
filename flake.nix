@@ -40,8 +40,8 @@
     in
     {
       packages = builtins.mapAttrs (_: p: {
-        default = p.pydd-drv;
-        inherit (p) pydd-drv pydd-docs;
+        inherit (p.packages) default pydd-drv;
+        pydd-docs = p.docs.default;
       }) each;
     };
 }
