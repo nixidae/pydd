@@ -19,7 +19,7 @@ let
 
   pydd = callLib { inherit huggorm nix; };
 
-  inherit (import sources.nixvenv { inherit pkgs; }) nixvenv;
+  inherit ((import sources.nixvenv { inherit pkgs; }).lib) nixvenv;
   # Every instance of the library takes nixvenv, for its planners.
   callLib = args: pkgs.callPackage ./lib ({ inherit nixvenv; } // args);
 
