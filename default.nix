@@ -170,7 +170,7 @@ rec {
   # The workflow as a value, from ci/workflows/pages.nix, and as the file GitHub
   # reads. `ghalib.toYamlScript` writes a multi-line `run:` as a literal
   # block and quotes `'on'`; pynixd's default.nix gives the reasons.
-  ghalib = import sources.ghanix { inherit lib; };
+  ghalib = (import sources.ghanix { inherit lib; }).lib;
   ciWorkflow = import ./ci/workflows/pages.nix {
     inherit lib ghalib;
     nixVersion = pkgs.nix.version;
