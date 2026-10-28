@@ -586,6 +586,16 @@ rec {
     "test"
     "node"
   ];
+
+  # The schema of nixidae/nixidae#1103, with `checks` above and `lib`
+  # below. Every other name in this set is internal.
+  packages = {
+    inherit pydd-drv pydd-drv-released;
+    default = pydd-drv;
+  };
+  nixosModules = { };
+  docs.default = pydd-docs;
+  ciTestWorkflows = { };
 }
 // {
   /**
