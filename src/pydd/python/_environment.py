@@ -49,8 +49,7 @@ from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
 from pydd.core import writer_from_environ
-from pydd.modes import root as choose_root
-from pydd.modes import submit
+from pydd.modes import root as choose_root, submit
 from pydd.python import (
     Artifact,
     EdgeEdit,
@@ -59,6 +58,7 @@ from pydd.python import (
     LockError,
     Plan,
     Target,
+    _build_systems as build_systems,
     build_requirements,
     build_system,
     build_tools_from,
@@ -71,13 +71,11 @@ from pydd.python import (
     select_lock,
     target_from_environ,
 )
-from pydd.python import _build_systems as build_systems
 from pydd.python._hook import requires_for_build, sites_of
 from pydd.python._poetrylock import PoetryProject
 from pydd.python._pylock import PylockProject
 from pydd.python._script import ScriptProject
-from pydd.python._workspace import members as members_of
-from pydd.python._workspace import selection
+from pydd.python._workspace import members as members_of, selection
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping

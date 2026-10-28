@@ -31,6 +31,7 @@ from pydd.modes import submit
 from pydd.python import (
     Artifact,
     Plan,
+    _build_systems as build_systems,
     build_system,
     build_tools_from,
     choose,
@@ -41,7 +42,6 @@ from pydd.python import (
     read_pyproject,
     target_from_environ,
 )
-from pydd.python import _build_systems as build_systems
 from pydd.python._hook import requires_for_build, sites_of
 from pydd.python._poetrylock import PoetryProject
 from pydd.python._pylock import PylockProject

@@ -25,11 +25,8 @@ pythonpath = ["src", "tests"]
 addopts = "-q --strict-markers --strict-config"
 
 [tool.ruff]
-line-length = 120
+extend = "nix/shared/ruff.toml"
 target-version = "py312"
-
-[tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "PIE", "RUF"]
 
 # A node reads its derivation's attributes, and Nix names them in lower case.
 [tool.ruff.lint.per-file-ignores]
