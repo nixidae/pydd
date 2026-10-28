@@ -594,6 +594,7 @@ rec {
     default = pydd-drv;
   };
   nixosModules = { };
+  easykubenixModules = { };
   docs.default = pydd-docs;
   ciTestWorkflows = { };
 }
