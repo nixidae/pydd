@@ -33,4 +33,6 @@ let
     map (rowOf package "wheel") (package.wheels or [ ])
     ++ map (rowOf package "sdist") (lib.optional (package ? sdist) package.sdist);
 in
-lib.concatMap rowsOf (builtins.filter (package: package.source ? registry) (document.package or [ ]))
+lib.concatMap rowsOf (
+  builtins.filter (package: package.source ? registry) (document.package or [ ])
+)

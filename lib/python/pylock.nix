@@ -71,7 +71,11 @@ let
   packages = document.packages or [ ];
 
   pyprojectFile = project + "/pyproject.toml";
-  pyproject = if builtins.pathExists pyprojectFile then builtins.fromTOML (builtins.readFile pyprojectFile) else { };
+  pyproject =
+    if builtins.pathExists pyprojectFile then
+      builtins.fromTOML (builtins.readFile pyprojectFile)
+    else
+      { };
   projectName = pyproject.project.name or null;
   environmentName =
     if venvName != null then
@@ -243,14 +247,16 @@ let
     inherit pkgs;
     name = environmentName;
     application = planned.out;
-    passthru = builtins.removeAttrs planned [
-      "out"
-      # The root's own `overrideAttrs` is mkDerivation's, not the planner's.
-      "overrideAttrs"
-    ] // {
-      dynamic = planned.out;
-      env = root;
-    };
+    passthru =
+      builtins.removeAttrs planned [
+        "out"
+        # The root's own `overrideAttrs` is mkDerivation's, not the planner's.
+        "overrideAttrs"
+      ]
+      // {
+        dynamic = planned.out;
+        env = root;
+      };
   };
 in
 lib.throwIfNot (lockVersion == "1.0")

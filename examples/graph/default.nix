@@ -49,7 +49,10 @@ let
   };
 
   leaf = node "graph-leaf" [ "-c" ''echo "hello from a node the planner wrote" > $out'' ] { };
-  read = path: [ "-c" ''read -r line < ${path}; echo "root read: $line" > $out'' ];
+  read = path: [
+    "-c"
+    ''read -r line < ${path}; echo "root read: $line" > $out''
+  ];
 
   graph =
     if released then
@@ -76,12 +79,7 @@ let
       "-c"
       (
         ''printf '%s' "$graph" | pydd-drv graph ''
-        + (
-          if recursive then
-            ''--store "$NIX_REMOTE" --out''
-          else
-            lib.optionalString released "--out"
-        )
+        + (if recursive then ''--store "$NIX_REMOTE" --out'' else lib.optionalString released "--out")
       )
     ];
     graph = builtins.toJSON graph;
@@ -93,10 +91,7 @@ let
       coreutils
     ];
     requiredSystemFeatures =
-      if recursive then
-        [ "recursive-nix" ]
-      else
-        lib.optional (!released) "builder-rpc-v0";
+      if recursive then [ "recursive-nix" ] else lib.optional (!released) "builder-rpc-v0";
     __contentAddressed = true;
     outputHashMode = "text";
     outputHashAlgo = "sha256";

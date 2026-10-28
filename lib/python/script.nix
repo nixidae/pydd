@@ -48,7 +48,9 @@ let
     own = ownArtifacts;
   };
 
-  sourceBuilt = map (package: package.name) (builtins.filter (package: package ? sdist) (document.package or [ ]));
+  sourceBuilt = map (package: package.name) (
+    builtins.filter (package: package ? sdist) (document.package or [ ])
+  );
   hintedBuildTools = lib.optionalAttrs nixpkgsHints (
     import ./hints.nix { inherit lib pkgs python; } sourceBuilt
   );
@@ -98,17 +100,17 @@ let
       } > "$out/bin/${name}"
       chmod +x "$out/bin/${name}"
     '';
-    passthru = builtins.removeAttrs planned [
-      "out"
-      "overrideAttrs"
-    ] // {
-      dynamic = planned.out;
-      env = root;
-    };
+    passthru =
+      builtins.removeAttrs planned [
+        "out"
+        "overrideAttrs"
+      ]
+      // {
+        dynamic = planned.out;
+        env = root;
+      };
   };
 in
-lib.throwIf (foreign != [ ])
-  "script.nix: ${toString lockFile} resolves ${
-    lib.concatMapStringsSep ", " (package: "'${package.name}'") foreign
-  } from a source that is not a registry, and this reader takes registry packages only"
-  root
+lib.throwIf (foreign != [ ]) "script.nix: ${toString lockFile} resolves ${
+  lib.concatMapStringsSep ", " (package: "'${package.name}'") foreign
+} from a source that is not a registry, and this reader takes registry packages only" root

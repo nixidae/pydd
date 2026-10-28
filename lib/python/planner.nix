@@ -391,7 +391,12 @@ let
           null
         else
           builder {
-            inherit (entry) package version filename kind;
+            inherit (entry)
+              package
+              version
+              filename
+              kind
+              ;
             src = entry.path or entry.drv;
           };
     in
@@ -610,7 +615,9 @@ let
         ;
       fromNixpkgs = nixpkgsRows;
       artifacts = map row entries;
-      tools = builtins.mapAttrs (_: tool: if builtins.isList tool then map built tool else built tool) tools;
+      tools = builtins.mapAttrs (
+        _: tool: if builtins.isList tool then map built tool else built tool
+      ) tools;
       inherit scripts;
       interpreter = { inherit (python) executable sitePackages; };
       # The planner reads the `pyproject.toml` of each tree below, and resolves

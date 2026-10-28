@@ -110,22 +110,30 @@ let
   );
 in
 {
-  /** The build tools that an override names, by package. */
+  /**
+    The build tools that an override names, by package.
+  */
   buildTools = lib.mapAttrs (_: override: override.buildTools) (
     lib.filterAttrs (_: override: override ? buildTools) merged
   );
 
-  /** The edges that an override adds and drops, by package, as `{ add, drop }`. */
+  /**
+    The edges that an override adds and drops, by package, as `{ add, drop }`.
+  */
   dependencies = lib.mapAttrs (_: override: override.dependencies) (
     lib.filterAttrs (_: override: override ? dependencies) merged
   );
 
-  /** The one artefact that replaces the artefacts of each package in the menu. */
+  /**
+    The one artefact that replaces the artefacts of each package in the menu.
+  */
   artifacts = lib.mapAttrs (_: override: override.artifact) (
     lib.filterAttrs (_: override: override ? artifact) merged
   );
 
-  /** Every other key, by package, for the `overrides` argument of `planner.nix`. */
+  /**
+    Every other key, by package, for the `overrides` argument of `planner.nix`.
+  */
   nodes = lib.filterAttrs (_: override: override != { }) (
     lib.mapAttrs (
       _: override:

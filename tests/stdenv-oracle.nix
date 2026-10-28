@@ -8,8 +8,7 @@ let
   pkgs = import nixpkgs { system = "x86_64-linux"; };
   template = (import ../lib/python/stdenv-template.nix { inherit pkgs; }).encoded;
   json =
-    name: value:
-    builtins.toFile name (builtins.unsafeDiscardStringContext (builtins.toJSON value));
+    name: value: builtins.toFile name (builtins.unsafeDiscardStringContext (builtins.toJSON value));
   plain = json "document.json" oracle.document;
   carrying = json "document-stdenv.json" (oracle.document // { stdenv = template; });
   drvOf =

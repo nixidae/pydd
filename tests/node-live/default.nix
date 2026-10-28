@@ -21,7 +21,9 @@ let
     http-server = {
       src = pkgs.applyPatches {
         name = "http-server-source";
-        src = github "http-party" "http-server" "v14.1.1" "sha256-M/YC721QWJfz5sYX6RHm1U9WPHVRBD0ZL2/ceYItnhs=";
+        src =
+          github "http-party" "http-server" "v14.1.1"
+            "sha256-M/YC721QWJfz5sYX6RHm1U9WPHVRBD0ZL2/ceYItnhs=";
         patches = [
           (pkgs.fetchpatch {
             name = "regenerate-package-lock.patch";
@@ -55,7 +57,9 @@ let
     };
     # TypeScript, compiled by tsc in `npm run build`.
     json-server = {
-      src = github "typicode" "json-server" "v1.0.0-beta.3" "sha256-NDSmlW5SiA81Tf6kfkaaKUh05aGZEBajqkLZoxBv0Wc=";
+      src =
+        github "typicode" "json-server" "v1.0.0-beta.3"
+          "sha256-NDSmlW5SiA81Tf6kfkaaKUh05aGZEBajqkLZoxBv0Wc=";
       check = ''
         json-server --help > help
         grep -q Usage help

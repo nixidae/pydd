@@ -347,7 +347,14 @@ in
   expectedStdenv = builtins.listToAttrs (
     map (node: {
       inherit (node) name;
-      value = (graph (document // { inherit stdenv; root = node.name; })).drvPath;
+      value =
+        (graph (
+          document
+          // {
+            inherit stdenv;
+            root = node.name;
+          }
+        )).drvPath;
     }) sourceNodes
   );
   expected = builtins.listToAttrs (

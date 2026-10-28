@@ -7,10 +7,19 @@
 let
   github =
     owner: repo: rev: hash:
-    pkgs.fetchFromGitHub { inherit owner repo rev hash; };
+    pkgs.fetchFromGitHub {
+      inherit
+        owner
+        repo
+        rev
+        hash
+        ;
+    };
   projects = {
     uv-fastapi-example = {
-      src = github "astral-sh" "uv-fastapi-example" "a1e313147b9be055167fe500d457d7c0b2f51318" "sha256-ewK4lEhTSRiT5CrXNukmKGOW3f5ENW4Y+aF4OZa83mY=";
+      src =
+        github "astral-sh" "uv-fastapi-example" "a1e313147b9be055167fe500d457d7c0b2f51318"
+          "sha256-ewK4lEhTSRiT5CrXNukmKGOW3f5ENW4Y+aF4OZa83mY=";
       # Locked in 2024, for CPython 3.12. Newer: pydantic-core 2.20.1 has no
       # wheel for 3.14, and its sdist needs Rust and cargo's network;
       # httptools 0.6.1 ships C for the 3.12 API, which 3.13 changed.
@@ -22,7 +31,9 @@ let
     };
     # pdm-backend, editable; uvloop and httptools as binary wheels.
     fastapi-cli = {
-      src = github "fastapi" "fastapi-cli" "093be9ca19f2ef44ba523aae0a98d6c9ea2e0888" "sha256-TzO2rtrJSjaNwCevNCZl4zS+Us09Q3Zd0bWJfNNia0g=";
+      src =
+        github "fastapi" "fastapi-cli" "093be9ca19f2ef44ba523aae0a98d6c9ea2e0888"
+          "sha256-TzO2rtrJSjaNwCevNCZl4zS+Us09Q3Zd0bWJfNNia0g=";
       check = ''
         python -c 'import fastapi_cli, uvicorn; print("fastapi-cli", fastapi_cli.__version__)'
         fastapi --help > /dev/null
@@ -30,7 +41,9 @@ let
     };
     # pdm-backend; a dev group with mypy and pillow (manylinux libz).
     typer = {
-      src = github "tiangolo" "typer" "b15210b71a5b9b35be82a1ffdb172ef7b3a89d85" "sha256-Rg5vFInHqLDObGTFQ8k86Yw45+lXGdLIcgVFV6Z/gB0=";
+      src =
+        github "tiangolo" "typer" "b15210b71a5b9b35be82a1ffdb172ef7b3a89d85"
+          "sha256-Rg5vFInHqLDObGTFQ8k86Yw45+lXGdLIcgVFV6Z/gB0=";
       check = ''
         python -c 'import typer, PIL.Image; print("typer", typer.__version__)'
         typer --help > /dev/null
@@ -39,7 +52,9 @@ let
     # A workspace of hatchling and uv-dynamic-versioning, whose root is a
     # metapackage with no code.
     fastmcp = {
-      src = github "jlowin" "fastmcp" "e2fcc412001ff7414095c5dc282f94c70299a612" "sha256-lhY94NoHClMQlP95lTT+Zg/TXZhYBy9Gv4EFQyv7Gkw=";
+      src =
+        github "jlowin" "fastmcp" "e2fcc412001ff7414095c5dc282f94c70299a612"
+          "sha256-lhY94NoHClMQlP95lTT+Zg/TXZhYBy9Gv4EFQyv7Gkw=";
       check = ''
         python -c 'import fastmcp; print("fastmcp", fastmcp.__version__)'
         fastmcp --help > /dev/null
@@ -48,7 +63,9 @@ let
     # A workspace of 17 members: hatchling, uv-dynamic-versioning, and a
     # setuptools member that writes an import finder.
     mcp-python-sdk = {
-      src = github "modelcontextprotocol" "python-sdk" "754254c08fe1c3eda18b69da3d336106fe8d72d6" "sha256-3vncmONkKNoKoi1kCFYszfR+BP+rtelhY5Ua8ioBae4=";
+      src =
+        github "modelcontextprotocol" "python-sdk" "754254c08fe1c3eda18b69da3d336106fe8d72d6"
+          "sha256-3vncmONkKNoKoi1kCFYszfR+BP+rtelhY5Ua8ioBae4=";
       check = ''
         python -c 'import mcp, mcp.server.mcpserver; print("mcp", mcp.server.mcpserver.MCPServer.__name__)'
         # pyyaml 6.0.2 has no wheel for 3.14, and its sdist falls back to pure
@@ -61,7 +78,13 @@ in
 builtins.mapAttrs (
   name: entry:
   let
-    planner = pydd.python.uv ({ project = entry.src; venvName = name; } // entry.arguments or { });
+    planner = pydd.python.uv (
+      {
+        project = entry.src;
+        venvName = name;
+      }
+      // entry.arguments or { }
+    );
     venv = planner.dynamic;
   in
   {

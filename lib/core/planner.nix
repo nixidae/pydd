@@ -166,43 +166,44 @@ in
       venv = nixvenv {
         inherit python;
         packages =
-          _:
-          [ (pyddPackage python modules) ] ++ lib.optional (writer == "huggorm") huggorm ++ pythonPath;
+          _: [ (pyddPackage python modules) ] ++ lib.optional (writer == "huggorm") huggorm ++ pythonPath;
       };
-      attributes = env // {
-        inherit allowImportFromDerivation;
-        name = "${name}.drv";
-        inherit system;
-        builder = "${bash}/bin/bash";
-        # The full path: CPython finds its prefix from argv[0], and Nix runs a
-        # builder with only the basename there.
-        args = [
-          "-c"
-          "exec ${venv}/bin/python ${plan}"
-        ];
+      attributes =
+        env
+        // {
+          inherit allowImportFromDerivation;
+          name = "${name}.drv";
+          inherit system;
+          builder = "${bash}/bin/bash";
+          # The full path: CPython finds its prefix from argv[0], and Nix runs a
+          # builder with only the basename there.
+          args = [
+            "-c"
+            "exec ${venv}/bin/python ${plan}"
+          ];
 
-        requiredSystemFeatures =
-          lib.optional (protocol == "rpc") "builder-rpc-v0"
-          ++ lib.optional (protocol == "recursive") "recursive-nix";
-        # The submitted object is a derivation, and a derivation is
-        # text-ingested.
-        __contentAddressed = true;
-        outputHashMode = "text";
-        outputHashAlgo = "sha256";
+          requiredSystemFeatures =
+            lib.optional (protocol == "rpc") "builder-rpc-v0"
+            ++ lib.optional (protocol == "recursive") "recursive-nix";
+          # The submitted object is a derivation, and a derivation is
+          # text-ingested.
+          __contentAddressed = true;
+          outputHashMode = "text";
+          outputHashAlgo = "sha256";
 
-        PATH = lib.makeBinPath [ (if writer == "drv" then pyddDrv else nix) ];
-        PYTHONDONTWRITEBYTECODE = "1";
+          PATH = lib.makeBinPath [ (if writer == "drv" then pyddDrv else nix) ];
+          PYTHONDONTWRITEBYTECODE = "1";
 
-        PYDD_WRITER = writer;
-        PYDD_PROTOCOL = protocol;
-        PYDD_SYSTEM = system;
-        PYDD_MENU = builtins.toJSON menu;
-      }
-      # `tools/measure-modes.py` sets this, with `--impure`, so every planner
-      # of a graph runs again and no node does. A pure evaluation reads "".
-      // lib.optionalAttrs (builtins.getEnv "PYDD_MEASURE" != "") {
-        PYDD_MEASURE = builtins.getEnv "PYDD_MEASURE";
-      };
+          PYDD_WRITER = writer;
+          PYDD_PROTOCOL = protocol;
+          PYDD_SYSTEM = system;
+          PYDD_MENU = builtins.toJSON menu;
+        }
+        # `tools/measure-modes.py` sets this, with `--impure`, so every planner
+        # of a graph runs again and no node does. A pure evaluation reads "".
+        // lib.optionalAttrs (builtins.getEnv "PYDD_MEASURE" != "") {
+          PYDD_MEASURE = builtins.getEnv "PYDD_MEASURE";
+        };
 
       # `allowImportFromDerivation` is an attribute of the planner, so
       # `overrideAttrs` reaches it, and `NIX_CONFIG` follows it here.
@@ -238,13 +239,11 @@ in
           */
           overrideAttrs = f: result (attrs // f attrs);
           # What the planner runs on, as one derivation, for copying to a store.
-          closure = linkFarmFromDrvs "${name}-planner-closure" (
-            [
-              bash
-              venv
-              (if writer == "drv" then pyddDrv else nix)
-            ]
-          );
+          closure = linkFarmFromDrvs "${name}-planner-closure" ([
+            bash
+            venv
+            (if writer == "drv" then pyddDrv else nix)
+          ]);
         };
     in
     result attributes;

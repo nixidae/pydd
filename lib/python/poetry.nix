@@ -104,7 +104,12 @@ let
   );
 
   overridden = import ./overrides.nix {
-    inherit lib pkgs project projectName;
+    inherit
+      lib
+      pkgs
+      project
+      projectName
+      ;
     declared = pyproject.tool.pydd.overrides or { };
     inherit overrides;
   };
@@ -154,14 +159,16 @@ let
     inherit pkgs;
     name = environmentName;
     application = planned.out;
-    passthru = builtins.removeAttrs planned [
-      "out"
-      # The root's own `overrideAttrs` is mkDerivation's, not the planner's.
-      "overrideAttrs"
-    ] // {
-      dynamic = planned.out;
-      env = root;
-    };
+    passthru =
+      builtins.removeAttrs planned [
+        "out"
+        # The root's own `overrideAttrs` is mkDerivation's, not the planner's.
+        "overrideAttrs"
+      ]
+      // {
+        dynamic = planned.out;
+        env = root;
+      };
   };
 in
 root

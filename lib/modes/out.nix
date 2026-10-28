@@ -25,8 +25,7 @@ let
   # The form that `built` of `../python/planner.nix` gives a tool, with its
   # context, as the host evaluation of a node needs it.
   hostTools = builtins.mapAttrs (
-    _: tool:
-    if builtins.isList tool then map (one: { out = "${one}"; }) tool else { out = "${tool}"; }
+    _: tool: if builtins.isList tool then map (one: { out = "${one}"; }) tool else { out = "${tool}"; }
   ) tools;
 
   # **On released Nix the host makes each node that a planner names, except

@@ -395,24 +395,26 @@ let
     application = planned.out;
     program = if application == null then null else chosenProgram;
     name = environmentName;
-    passthru = builtins.removeAttrs planned [
-      "out"
-      # The root's own `overrideAttrs` is mkDerivation's, not the planner's.
-      "overrideAttrs"
-    ] // {
-      dynamic = planned.out;
-      inherit lockCheck environment;
-      app =
-        if application == null then
-          throw (
-            "uv.nix: `app` is the application, and this call names no application. "
-            + "Pass `application`, or use this result itself for the environment."
-          )
-        else
-          root;
-      env = environment;
-      shell = developmentShell;
-    };
+    passthru =
+      builtins.removeAttrs planned [
+        "out"
+        # The root's own `overrideAttrs` is mkDerivation's, not the planner's.
+        "overrideAttrs"
+      ]
+      // {
+        dynamic = planned.out;
+        inherit lockCheck environment;
+        app =
+          if application == null then
+            throw (
+              "uv.nix: `app` is the application, and this call names no application. "
+              + "Pass `application`, or use this result itself for the environment."
+            )
+          else
+            root;
+        env = environment;
+        shell = developmentShell;
+      };
   };
 
   # **A development shell over that same environment.**
@@ -505,12 +507,16 @@ let
     import ./hints.nix { inherit lib pkgs python; } sourceBuilt
   );
   overridden = import ./overrides.nix {
-    inherit lib pkgs project projectName;
+    inherit
+      lib
+      pkgs
+      project
+      projectName
+      ;
     declared = declared.overrides or { };
     inherit overrides;
   };
-  chosenBuildTools =
-    hintedBuildTools // declaredBuildTools // overridden.buildTools // buildTools;
+  chosenBuildTools = hintedBuildTools // declaredBuildTools // overridden.buildTools // buildTools;
 
   # **Which package comes from nixpkgs rather than the index, in that same
   # table.** The reason is the one that `./planner.nix` gives at its
