@@ -20,7 +20,7 @@ import tempfile
 from dataclasses import dataclass
 from typing import Any
 
-from pydd.core import Derivation, Node, Planner, tool_env
+from pydd.core import Derivation, Native, Node, Planner, tool_env
 
 RUN = "run-custom-build"
 
@@ -45,7 +45,7 @@ class Menu:
     script: str
     target: str
     #: Tools and environment of a crate, by crate name (`lib/rust/hints.nix`).
-    native: dict[str, Any]
+    native: dict[str, Native]
     #: The project's directory inside `project`, which may hold path
     #: dependencies outside it.
     subdir: str
@@ -248,7 +248,8 @@ class Graph:
         if unit["mode"] == "doctest":
             return f"{base}-doctest"
         if "bin" in unit["target"]["kind"]:
-            return unit["target"]["name"]
+            name: str = unit["target"]["name"]
+            return name
         return base
 
     def node(self, index: int) -> Node:
@@ -264,7 +265,7 @@ class Graph:
                 case _:
                     spec = self.compile_spec(index)
             crate = self.packages[unit["pkg_id"]]["name"]
-            native = self.menu.native.get(crate, {"tools": [], "env": {}})
+            native = self.menu.native.get(crate, Native(tools=[], env={}))
             self.nodes[index] = self.planner.add(self.derivation(self.name(index), spec, self.inputs(index), native))
         return self.nodes[index]
 
@@ -280,11 +281,11 @@ class Graph:
         name: str,
         spec: dict[str, Any],
         inputs: list[int],
-        native: dict[str, Any] | None = None,
+        native: Native | None = None,
         extra: list[Node] | None = None,
     ) -> Derivation:
         menu = self.menu
-        tools: list[str] = (native or {}).get("tools", [])
+        tools = native["tools"] if native else []
         # A build script finds a library through pkg-config, or compiles C
         # with the `cc` crate, which reads `CFLAGS`. libz-sys probes for zlib
         # with `-lz`, and builds its own copy when the probe fails.
@@ -296,7 +297,8 @@ class Graph:
             for tool in tools:
                 if os.path.exists(f"{tool}/bin/{menu.prefix}pkg-config"):
                     env["TARGET_PKG_CONFIG"] = f"{tool}/bin/{menu.prefix}pkg-config"
-        env |= (native or {}).get("env", {})
+        if native:
+            env |= native["env"]
         return Derivation(
             name=name,
             system=self.planner.system,
@@ -313,8 +315,9 @@ class Graph:
 
     def build_script_run(self, index: int) -> int | None:
         for dep in self.units[index]["dependencies"]:
-            if self.units[dep["index"]]["mode"] == RUN:
-                return dep["index"]
+            run: int = dep["index"]
+            if self.units[run]["mode"] == RUN:
+                return run
         return None
 
     def compile_spec(self, index: int) -> dict[str, Any]:

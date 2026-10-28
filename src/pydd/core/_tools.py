@@ -3,6 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TypedDict
+
+
+class Native(TypedDict):
+    """A package's native tools and environment, by package name in a lane's menu."""
+
+    tools: list[str]
+    env: dict[str, str]
 
 
 def tool_env(tools: Sequence[str], path: str = "") -> dict[str, str]:

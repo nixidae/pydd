@@ -17,7 +17,7 @@ from ._hash import (
     placeholder,
 )
 from ._planner import Node, Planner
-from ._tools import tool_env
+from ._tools import Native, tool_env
 from ._writer import (
     CliWriter,
     DrvWriter,
@@ -38,6 +38,7 @@ __all__ = [
     "HuggormWriter",
     "InputAddressed",
     "Method",
+    "Native",
     "Node",
     "OutWriter",
     "Output",

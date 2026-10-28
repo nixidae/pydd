@@ -20,10 +20,17 @@ import json
 import posixpath
 import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, NotRequired
 
-from pydd.core import Derivation, Fixed, Node, Planner, tool_env
+from pydd.core import Derivation, Fixed, Native, Node, Planner, tool_env
 from pydd.node import _readers
+
+
+class PackageNative(Native):
+    """A package's native tools and environment, and the source that replaces its tarball."""
+
+    src: NotRequired[str]
+
 
 #: Nix's systems as npm's `cpu` and `os` name them.
 CPU = {"x86_64": "x64", "aarch64": "arm64", "i686": "ia32", "armv7l": "arm", "riscv64": "riscv64"}
@@ -51,7 +58,7 @@ class Menu:
     #: the Python and make that node-gyp calls.
     tools: list[str]
     #: Tools and environment of a package, by package name.
-    native: dict[str, Any]
+    native: dict[str, PackageNative]
     #: npm's `--omit`: `dev`, `optional` or `peer`.
     omit: list[str]
     #: The scripts of `package.json` that the root runs, in order, in the
@@ -94,7 +101,8 @@ FLOATING = {"outputHashMode": "recursive", "outputHashAlgo": "sha256"}
 def name_of(path: str, entry: dict[str, Any]) -> str:
     """The name that a package installs as. An alias installs under the alias."""
     if "node_modules/" not in path:
-        return entry.get("name", posixpath.basename(path))
+        name: str = entry.get("name", posixpath.basename(path))
+        return name
     return path.rsplit("node_modules/", 1)[1]
 
 
@@ -219,7 +227,8 @@ class Lock:
             if entry is None:
                 continue
             if entry.get("link"):
-                return entry["resolved"]
+                member: str = entry["resolved"]
+                return member
             return candidate if self.present(candidate) else None
         return None
 
@@ -369,7 +378,8 @@ class Graph:
         extra_env: dict[str, str] | None = None,
     ) -> Derivation:
         menu = self.menu
-        native = menu.native.get(package or "", {"tools": [], "env": {}}) if scripted else {"tools": [], "env": {}}
+        none = PackageNative(tools=[], env={})
+        native = menu.native.get(package or "", none) if scripted else none
         tools = [*native["tools"], *(extra or []), *(menu.tools if scripted else [])]
         env = tool_env(tools, f"{menu.nodejs}/bin") | {"PYDD_NPM": dump(spec)} | FLOATING
         env |= native["env"] | (extra_env or {})
@@ -485,8 +495,8 @@ class Graph:
         fetches it, and the store path that holds it.
         """
         entry = self.lock.packages[path]
-        replaced = self.menu.native.get(name_of(path, entry), {}).get("src")
-        if replaced is not None:
+        native = self.menu.native.get(name_of(path, entry))
+        if native and (replaced := native.get("src")) is not None:
             return replaced, [], [replaced]
         resolved: str = entry["resolved"]
         if re.match(r"^https?://", resolved):
