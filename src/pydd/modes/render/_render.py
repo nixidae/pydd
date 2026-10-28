@@ -152,7 +152,8 @@ class Graph:
 
     @staticmethod
     def fetched(artifact: dict[str, Any]) -> Text:
-        return artifact["path"] if "path" in artifact else artifact["out"]
+        path: Text = artifact["path"] if "path" in artifact else artifact["out"]
+        return path
 
     def venv_scripts(self) -> dict[str, Text]:
         """`venvScripts` of `graph.nix`."""
@@ -204,7 +205,8 @@ class Graph:
         if "patches" in override:
             attrs["patches"] = join(" ", (patch["out"] for patch in override["patches"]))
             attrs["patch"] = cat(self.tool["patch"], "/bin/patch")
-        return attrs | override.get("env", {})
+        env: dict[str, Text] = override.get("env", {})
+        return attrs | env
 
     def local(self, node: dict[str, Any], mode: str) -> dict[str, Any]:
         return {

@@ -5,6 +5,7 @@
   runCommand,
   nixVersions,
   ruff,
+  zuban,
   huggorm,
   pydd-drv,
   nixvenv,
@@ -41,6 +42,17 @@ let
   };
   fixed = derivation fixedAttrs;
 
+  python = nixvenv {
+    python = huggorm.pythonModule;
+    packages = ps: [
+      ps.pytest
+      ps.packaging
+      ps.pyyaml
+      huggorm
+    ];
+    executables = [ "pytest" ];
+  };
+
   plain = s: builtins.unsafeDiscardStringContext s;
 
   # Without the leading slash: Nix rewrites this build's own placeholders
@@ -70,26 +82,20 @@ in
 runCommand "pydd-tests"
   {
     nativeBuildInputs = [
-      (nixvenv {
-        python = huggorm.pythonModule;
-        packages = ps: [
-          ps.pytest
-          ps.packaging
-          ps.pyyaml
-          huggorm
-        ];
-        executables = [ "pytest" ];
-      })
+      python
       nixVersions.git
       ruff
+      zuban
     ];
     src = lib.fileset.toSource {
       root = ../.;
       fileset = lib.fileset.unions [
         ../pyproject.toml
+        ../mypy.ini
         ../nix/shared
         ../src
         ../tests
+        ../tools
         ../examples
         ../lib/python/graph.nix
         ../lib/modes/nix-eval.nix
@@ -120,6 +126,8 @@ runCommand "pydd-tests"
     fi
     ruff check --no-cache .
     ruff format --no-cache --check .
+    # The venv's own interpreter: zuban reads the pyvenv.cfg beside it.
+    zuban mypy --python-executable ${python}/lib/venv/bin/python3
     pytest -p no:cacheprovider tests
     touch $out
   ''

@@ -29,6 +29,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from statistics import median
+from typing import TypedDict
 
 MODES = {
     "cli": ("NIX_MASTER", "store", "builder-rpc-v0"),
@@ -68,6 +69,29 @@ CACHE = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "pydd"
 OUT = Path("docs/_generated")
 
 
+class ModeCost(TypedDict):
+    closureBytes: int
+    lines: int
+    floorSeconds: float
+
+
+class PlannerTime(TypedDict):
+    seconds: float
+    packages: int | None
+
+
+class Measurements(TypedDict):
+    """`measurements.json`."""
+
+    revision: str
+    date: str
+    machine: str
+    runs: int
+    modes: dict[str, ModeCost]
+    #: By project, then by mode.
+    planners: dict[str, dict[str, PlannerTime]]
+
+
 def nix(*args: str, binary: str = "nix", env: dict[str, str] | None = None) -> str:
     result = subprocess.run(
         [binary, *args], capture_output=True, text=True, check=False, env={**os.environ, **(env or {})}
@@ -90,7 +114,8 @@ def closure_bytes(mode: str) -> int:
     path = nix("build", "--file", ".", f"projects.{mode}.pure-app.closure", "--no-link", "--print-out-paths")
     info = json.loads(nix("path-info", "--json", "--closure-size", path))
     # A list before Nix 2.19, and an object keyed by path since.
-    return (info[0] if isinstance(info, list) else next(iter(info.values())))["closureSize"]
+    size: int = (info[0] if isinstance(info, list) else next(iter(info.values())))["closureSize"]
+    return size
 
 
 def floor_seconds(mode: str) -> float:
@@ -167,31 +192,34 @@ def planner_seconds(mode: str, project: str) -> tuple[float, int | None]:
 
 def main() -> int:
     if sys.argv[1:] == ["--render"]:
-        (OUT / "measurements.md").write_text(render(json.loads((OUT / "measurements.json").read_text())))
+        measured: Measurements = json.loads((OUT / "measurements.json").read_text())
+        (OUT / "measurements.md").write_text(render(measured))
         return 0
     every = nix("eval", "--raw", "--file", ".", "projects.cli", "--apply", "p: toString (builtins.attrNames p)").split()
     projects = sys.argv[1:] or every
     previous = OUT / "measurements.json"
-    kept = json.loads(previous.read_text())["planners"] if sys.argv[1:] and previous.exists() else {}
+    kept: dict[str, dict[str, PlannerTime]] = (
+        json.loads(previous.read_text())["planners"] if sys.argv[1:] and previous.exists() else {}
+    )
     released = set(
         nix("eval", "--raw", "--file", ".", "projects.out", "--apply", "p: toString (builtins.attrNames p)").split()
     )
-    data: dict[str, object] = {
-        "revision": nix("log", "-r", "@-", "--no-graph", "-T", "commit_id.short(8)", binary="jj"),
-        "date": datetime.now(UTC).strftime("%Y-%m-%d"),
-        "machine": f"{platform.machine()}, {os.cpu_count()} cores",
-        "runs": RUNS,
-        "modes": {
-            mode: {
-                "closureBytes": closure_bytes(mode),
-                "lines": lines(MODE_FILES[mode]),
-                "floorSeconds": round(floor_seconds(mode), 2),
-            }
+    data = Measurements(
+        revision=nix("log", "-r", "@-", "--no-graph", "-T", "commit_id.short(8)", binary="jj"),
+        date=datetime.now(UTC).strftime("%Y-%m-%d"),
+        machine=f"{platform.machine()}, {os.cpu_count()} cores",
+        runs=RUNS,
+        modes={
+            mode: ModeCost(
+                closureBytes=closure_bytes(mode),
+                lines=lines(MODE_FILES[mode]),
+                floorSeconds=round(floor_seconds(mode), 2),
+            )
             for mode in MODES
         },
-        "planners": {},
-    }
-    planners: dict[str, dict[str, dict[str, float | int | None]]] = {
+        planners={},
+    )
+    planners: dict[str, dict[str, PlannerTime]] = {
         project: by_mode for project, by_mode in kept.items() if project in every and project not in projects
     }
     for project in projects:
@@ -200,7 +228,7 @@ def main() -> int:
             if mode.startswith("out") and project not in released:
                 continue
             seconds, packages = planner_seconds(mode, project)
-            planners[project][mode] = {"seconds": round(seconds, 2), "packages": packages}
+            planners[project][mode] = PlannerTime(seconds=round(seconds, 2), packages=packages)
             print(f"{project:24} {mode:8} {seconds:6.2f} s  {packages} packages", file=sys.stderr)
     data["planners"] = {project: planners[project] for project in every if project in planners}
 
@@ -210,9 +238,9 @@ def main() -> int:
     return 0
 
 
-def render(data: dict[str, object]) -> str:
-    modes: dict[str, dict[str, int]] = data["modes"]  # type: ignore[assignment]
-    planners: dict[str, dict[str, dict[str, float]]] = data["planners"]  # type: ignore[assignment]
+def render(data: Measurements) -> str:
+    modes = data["modes"]
+    planners = data["planners"]
     names = list(MODES)
     out = [
         f"Measured at `{data['revision']}` on {data['date']}, {data['machine']}; the median of {data['runs']} runs.",
@@ -234,9 +262,8 @@ def render(data: dict[str, object]) -> str:
     ]
     for project, by_mode in planners.items():
         cells = [f"{by_mode[mode]['seconds']:.2f}" if mode in by_mode else "-" for mode in names]
-        packages = by_mode["cli"].get("packages")
-        packages = "-" if packages is None else packages
-        out.append(f"| {project} | {packages} | " + " | ".join(cells) + " |")
+        packages = by_mode["cli"]["packages"]
+        out.append(f"| {project} | {'-' if packages is None else packages} | " + " | ".join(cells) + " |")
     return "\n".join(out) + "\n"
 
 

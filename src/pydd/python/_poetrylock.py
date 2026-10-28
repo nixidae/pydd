@@ -64,7 +64,8 @@ class PoetryProject:
 
     @property
     def packages(self) -> list[dict[str, Any]]:
-        return self.lock.get("package", [])
+        packages: list[dict[str, Any]] = self.lock.get("package", [])
+        return packages
 
     def _check_version(self) -> None:
         version = str(self.lock.get("metadata", {}).get("lock-version", ""))
@@ -104,7 +105,7 @@ class PoetryProject:
                 continue
             roots.append(f"{name}=={package['version']}")
 
-        pins = {
+        pins: dict[str, str] = {
             canonicalize_name(package["name"]): f"{package['name']}=={package['version']}" for package in self.packages
         }
         roots += added_pins(self.edits, (canonicalize_name(root.split("==")[0]) for root in roots), pins, "poetry.lock")

@@ -12,30 +12,94 @@ build script writes `OUT_DIR` under `$out/target`, laid out as cargo lays
 it out, and what the script printed, by kind, to `$out/flags.json`.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import subprocess
 import sys
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+
+#: `[flag, value]`, such as `["-L", path]` or `["-l", name]`. A list, as
+#: JSON gives it back.
+type LinkPair = list[str]
+#: `[scope, binary, argument]` of a `cargo:rustc-link-arg*`.
+type LinkArgument = list[str]
+
+
+class Extern(TypedDict):
+    name: str
+    path: str
+
+
+class Unit(TypedDict, total=False):
+    """`PYDD_UNIT`, as `pydd.rust` writes it. Each action has its own keys."""
+
+    action: Literal["compile", "run", "doctest", "check", "join"]
+    src: str
+    srcs: list[str]
+    cwd: str
+    program: str
+    flags: list[str]
+    externs: list[Extern]
+    search: list[str]
+    link_from: list[str]
+    build_script: str | None
+    env: dict[str, str]
+    output: Literal["lib", "bin", "build-script"]
+    file: str
+    kinds: list[str]
+    testing: bool
+    has_lib: bool
+    target: str
+    links: str | None
+    metadata_from: list[str]
+    writable: bool
+    bins: list[str]
+    logs: dict[str, str]
+
+
+class Printed(TypedDict):
+    """What a build script printed, by kind: its node's `flags.json`."""
+
+    cfg: list[str]
+    env: dict[str, str]
+    search: list[LinkPair]
+    libs: list[LinkPair]
+    args: list[LinkArgument]
+    metadata: dict[str, str]
+    out_dir: NotRequired[str]
+
 
 # A test imports this file with neither set.
-unit = json.loads(os.environ.get("PYDD_UNIT", "{}"))
+unit: Unit = json.loads(os.environ.get("PYDD_UNIT", "{}"))
 out = os.environ.get("out", "")  # noqa: SIM112 - Nix names it `out`
 
 
-def read_json(path, default):
+def read_link(node: str) -> list[LinkPair]:
     try:
-        with open(path, encoding="utf-8") as handle:
-            return json.load(handle)
+        with open(f"{node}/link.json", encoding="utf-8") as handle:
+            pairs: list[LinkPair] = json.load(handle)
     except FileNotFoundError:
-        return default
+        return []
+    return pairs
 
 
-def write_json(path, value):
+def read_printed(node: str) -> Printed:
+    with open(f"{node}/flags.json", encoding="utf-8") as handle:
+        printed: Printed = json.load(handle)
+    return printed
+
+
+def write_json(path: str, value: object) -> None:
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(value, handle, indent=1, sort_keys=True)
 
 
-def unique(items):
+def unique[T](items: Iterable[T]) -> list[T]:
     return list(dict.fromkeys(items))
 
 
@@ -43,7 +107,7 @@ def unique(items):
 LIBRARIES = {"lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro"}
 
 
-def link_argument_applies(scope, name):
+def link_argument_applies(scope: str, name: str) -> bool:
     """Whether a `rustc-link-arg*` of the package reaches this unit."""
     kinds = set(unit.get("kinds", []))
     testing = unit.get("testing", False)
@@ -65,7 +129,7 @@ def link_argument_applies(scope, name):
     return False
 
 
-def prepare():
+def prepare() -> tuple[list[str], dict[str, str], list[LinkPair], list[LinkPair]]:
     """The flags, environment and link pairs of a unit, with its build script's output.
 
     `search` goes on to every unit that links this one; `link` is the
@@ -73,12 +137,12 @@ def prepare():
     """
     flags = list(unit["flags"])
     env = dict(os.environ) | unit["env"]
-    search = []
+    search: list[LinkPair] = []
     for dependency in unit["link_from"]:
-        search += read_json(f"{dependency}/link.json", [])
-    link = []
+        search += read_link(dependency)
+    link: list[LinkPair] = []
     if script := unit["build_script"]:
-        printed = read_json(f"{script}/flags.json", {})
+        printed = read_printed(script)
         # Cargo's OUT_DIR stays writable while the crate compiles, and
         # tauri's `generate_context!` writes compressed assets into it.
         out_dir = os.path.join(os.environ.get("NIX_BUILD_TOP", "/tmp"), "out")
@@ -104,7 +168,7 @@ def prepare():
     return flags, env, link, search
 
 
-def compile_unit():
+def compile_unit() -> None:
     flags, env, link, search = prepare()
     match unit["output"]:
         case "lib":
@@ -123,7 +187,7 @@ def compile_unit():
     write_json(f"{out}/link.json", search)
 
 
-def logged(command, env, cwd=None):
+def logged(command: list[str], env: Mapping[str, str], cwd: str | None = None) -> None:
     """Run a test, and keep what it printed as the output."""
     os.makedirs(out)
     print(" ".join(command), file=sys.stderr)
@@ -135,7 +199,7 @@ def logged(command, env, cwd=None):
         sys.exit(result.returncode)
 
 
-def doctest_unit():
+def doctest_unit() -> None:
     flags, env, _, search = prepare()
     # rustdoc takes search paths, and a library records the libraries it
     # links in its own metadata.
@@ -144,13 +208,14 @@ def doctest_unit():
     logged(command, env)
 
 
-def check_unit():
+def check_unit() -> None:
     logged([unit["program"]], dict(os.environ) | unit["env"], cwd=unit["cwd"])
 
 
-def rustc_flags(value):
+def rustc_flags(value: str) -> list[LinkPair]:
     """`cargo:rustc-flags`, which takes `-l` and `-L`, with or without a space."""
-    pairs, words = [], value.split()
+    pairs: list[LinkPair] = []
+    words = value.split()
     while words:
         word = words.pop(0)
         if word in ("-l", "-L"):
@@ -162,9 +227,9 @@ def rustc_flags(value):
     return pairs
 
 
-def parse_cfg(text):
+def parse_cfg(text: str) -> dict[str, str]:
     """`rustc --print cfg` as cargo gives it to a build script: CARGO_CFG_<KEY>, values joined by commas."""
-    values = {}
+    values: dict[str, list[str]] = {}
     for line in text.splitlines():
         key, _, value = line.partition("=")
         # Cargo leaves this out: the profile decides it, and `PROFILE` says so.
@@ -176,7 +241,7 @@ def parse_cfg(text):
     return {f"CARGO_CFG_{key.upper()}": ",".join(found) for key, found in values.items()}
 
 
-def run_unit():
+def run_unit() -> None:
     # Cargo's `target/<profile>/build/<package>-<hash>/out`. tauri-build
     # finds its target directory as the parent of the ancestor named
     # `build`, and other scripts go up three levels; both land on
@@ -189,10 +254,10 @@ def run_unit():
     )
     env = parse_cfg(cfg.stdout) | env
     for dependency in unit["metadata_from"]:
-        env |= read_json(f"{dependency}/flags.json", {}).get("metadata", {})
+        env |= read_printed(dependency)["metadata"]
 
     cwd = unit["cwd"]
-    root = copy = None
+    root = copy = ""
     if unit.get("writable"):
         # Cargo leaves a workspace member's source writable, and tauri-build
         # writes into it. The copy's path goes back to the store path in what
@@ -207,11 +272,11 @@ def run_unit():
     # Not `check=True`: a failing script often says why on stdout only, as
     # tauri-build does, and the log must show it before the unit fails.
     result = subprocess.run([unit["program"]], cwd=cwd, env=env, stdout=subprocess.PIPE, text=True)
-    stdout = result.stdout if copy is None else result.stdout.replace(copy, root)
+    stdout = result.stdout.replace(copy, root) if copy else result.stdout
     sys.stderr.write(stdout)
     if result.returncode != 0:
         sys.exit(f"pydd: the build script of {unit['cwd']} failed with exit status {result.returncode}.")
-    printed = {"cfg": [], "env": {}, "search": [], "libs": [], "args": [], "metadata": {}}
+    printed = Printed(cfg=[], env={}, search=[], libs=[], args=[], metadata={}, out_dir=out_dir)
     links = (unit["links"] or "").upper().replace("-", "_")
     for line in stdout.splitlines():
         if not line.startswith("cargo:"):
@@ -248,7 +313,7 @@ def run_unit():
                 pass
             case _ if links and line.startswith("cargo:") and not line.startswith("cargo::"):
                 printed["metadata"][f"DEP_{links}_{key.upper()}"] = value
-    write_json(f"{out}/flags.json", printed | {"out_dir": out_dir})
+    write_json(f"{out}/flags.json", printed)
 
 
 if __name__ == "__main__":

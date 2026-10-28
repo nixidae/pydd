@@ -61,7 +61,7 @@ class PylockProject:
 
         # PEP 751: `extras` is empty and `dependency_groups` is `default-groups`
         # unless the installer is told otherwise. The export resolved both.
-        environment = {
+        environment: dict[str, str | frozenset[str]] = {
             **target.markers,
             "extras": frozenset[str](),
             "dependency_groups": frozenset(self.lock.default_groups or []),
@@ -85,7 +85,7 @@ class PylockProject:
                 raise LockError(f"pylock.toml gives {package.name} no version, and this reader pins each package")
             roots.append(f"{package.name}=={package.version}")
 
-        pins = {
+        pins: dict[str, str] = {
             canonicalize_name(package.name): f"{package.name}=={package.version}"
             for package in self.lock.packages
             if package.version is not None

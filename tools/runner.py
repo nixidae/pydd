@@ -201,14 +201,15 @@ class TestSet:
         async with limiter:
             for group, modes in GROUPS[self.name].items():
                 modes = [mode for mode in modes if mode not in RELEASED or project in self.released]
-                built = {mode: await self.mode(project, mode) for mode in modes}
-                if None in built.values():
+                attempted = {mode: await self.mode(project, mode) for mode in modes}
+                built = {mode: paths for mode, paths in attempted.items() if paths is not None}
+                if len(built) != len(attempted):
                     continue
                 if len(set(built.values())) == 1:
                     environment, root = next(iter(built.values()))
                     print(f"same  {project}  {environment} {root}  ({group}: {' '.join(modes)})", flush=True)
                 else:
-                    shown = " ".join(f"{mode}={' '.join(paths)}" for mode, paths in built.items() if paths)
+                    shown = " ".join(f"{mode}={' '.join(paths)}" for mode, paths in built.items())
                     self.fail(f"DIFFER  {project}  ({group})  {shown}")
 
 
@@ -217,7 +218,8 @@ async def attribute_names(attribute: str) -> list[str]:
         result = await anyio.run_process(
             ["nix", "eval", "--json", "--file", ".", attribute, "--apply", "builtins.attrNames"]
         )
-    return json.loads(result.stdout)
+    names: list[str] = json.loads(result.stdout)
+    return names
 
 
 async def collect(lanes: Iterable[Lane], cache: Path) -> None:

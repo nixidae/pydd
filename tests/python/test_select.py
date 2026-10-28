@@ -16,7 +16,7 @@ import io
 import json
 import tarfile
 import zipfile
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict, Unpack
 
 import pytest
 from packaging.requirements import Requirement
@@ -91,13 +91,25 @@ build-backend = "demoback"
 """
 
 
-def wheel(package: str, version: str, tag: str = "py3-none-any", **rest: str) -> Artifact:
+class Row(TypedDict, total=False):
+    """The fields of an `Artifact` that a test sets beyond its name and file."""
+
+    drv: str
+    out: str
+    path: str
+    marker: str | None
+    subdirectory: str
+    planner_drv: str
+    planner_out: str
+
+
+def wheel(package: str, version: str, tag: str = "py3-none-any", **rest: Unpack[Row]) -> Artifact:
     """One row of a lock file, as a wheel of `tag`."""
     filename = f"{package.replace('-', '_')}-{version}-{tag}.whl"
     return Artifact(package=package, version=version, filename=filename, kind="wheel", **rest)
 
 
-def sdist(package: str, version: str, **rest: str) -> Artifact:
+def sdist(package: str, version: str, **rest: Unpack[Row]) -> Artifact:
     """One row of a lock file, as a source distribution."""
     filename = f"{package.replace('-', '_')}-{version}.tar.gz"
     return Artifact(package=package, version=version, filename=filename, kind="sdist", **rest)

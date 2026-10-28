@@ -75,6 +75,10 @@ import tomllib
 from pathlib import Path
 from typing import Protocol, cast
 
+#: PEP 517's `config_settings`: a value is a string, or a list of them for a
+#: key given more than once.
+type ConfigSettings = dict[str, str | list[str]]
+
 
 class Pep660Backend(Protocol):
     """The one hook of PEP 660 that an editable node calls.
@@ -87,7 +91,7 @@ class Pep660Backend(Protocol):
     def build_editable(
         self,
         wheel_directory: str,
-        config_settings: dict[str, str] | None = None,
+        config_settings: ConfigSettings | None = None,
         metadata_directory: str | None = None,
     ) -> str: ...
 
@@ -103,7 +107,7 @@ class Pep517SdistBackend(Protocol):
     def build_sdist(
         self,
         sdist_directory: str,
-        config_settings: dict[str, str] | None = None,
+        config_settings: ConfigSettings | None = None,
     ) -> str: ...
 
 
@@ -113,7 +117,7 @@ class Pep517WheelBackend(Protocol):
     def build_wheel(
         self,
         wheel_directory: str,
-        config_settings: dict[str, str] | None = None,
+        config_settings: ConfigSettings | None = None,
         metadata_directory: str | None = None,
     ) -> str: ...
 
@@ -260,8 +264,9 @@ def writable_copy(source: Path) -> Path:
     return build_dir
 
 
-def config_settings() -> dict[str, str | list[str]] | None:
-    return json.loads(os.environ.get("configSettings") or "null")
+def config_settings() -> ConfigSettings | None:
+    settings: ConfigSettings | None = json.loads(os.environ.get("configSettings") or "null")
+    return settings
 
 
 def prepare(project: Path) -> None:

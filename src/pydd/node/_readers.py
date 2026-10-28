@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import posixpath
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -29,6 +29,14 @@ REGISTRY = "https://registry.npmjs.org"
 #: A dependency's version in a lock, or a link to a workspace member, as `link:<path>`.
 type Ref = str
 
+#: A lock, a `package.json` or one of their blocks, as its tool wrote it.
+#: The readers take the keys they know and pass the rest through.
+type Document = dict[str, Any]
+
+#: An entry of npm's `packages`. An npm lock passes through with every key
+#: that npm wrote.
+type Entry = dict[str, Any]
+
 
 def find_lock(directory: str) -> str:
     for name in LOCKS:
@@ -37,8 +45,9 @@ def find_lock(directory: str) -> str:
     raise SystemExit(f"pydd.node.npm: {directory} holds none of {', '.join(LOCKS)}.")
 
 
-def manifest(directory: str, path: str) -> dict[str, Any]:
-    return json.loads(Path(directory, path, "package.json").read_text(encoding="utf-8"))
+def manifest(directory: str, path: str) -> Document:
+    data: Document = json.loads(Path(directory, path, "package.json").read_text(encoding="utf-8"))
+    return data
 
 
 def registry_url(name: str, version: str, registry: str = REGISTRY) -> str:
@@ -51,7 +60,7 @@ def split_id(ident: str) -> tuple[str, str]:
     return ident[0] + name, version
 
 
-def importer_entry(directory: str, path: str, deps: dict[str, dict[str, Ref]]) -> dict[str, Any]:
+def importer_entry(directory: str, path: str, deps: dict[str, dict[str, Ref]]) -> Entry:
     """The entry of the project or a workspace member: its manifest, with the dependencies the lock resolves."""
     data = manifest(directory, path)
     entry = {key: data[key] for key in ("name", "version", "bin", "workspaces") if key in data}
@@ -79,16 +88,16 @@ class Version:
     #: The patch that pnpm applies to this version, relative to the project.
     patch: str | None = None
 
-    def entry(self, scripted: bool) -> dict[str, Any]:
-        entry: dict[str, Any] = {"name": self.name, "version": self.version, "resolved": self.resolved}
+    def entry(self, scripted: bool) -> Entry:
+        entry: Entry = {"name": self.name, "version": self.version, "resolved": self.resolved}
         if self.integrity:
             entry["integrity"] = self.integrity
         if self.dependencies:
             entry["dependencies"] = dict.fromkeys(sorted(self.dependencies), "*")
         if self.optional:
             entry["optionalDependencies"] = dict.fromkeys(sorted(self.optional), "*")
-        for key in ("os", "cpu", "libc", "bin"):
-            if (value := getattr(self, key)) is not None:
+        for key, value in (("os", self.os), ("cpu", self.cpu), ("libc", self.libc), ("bin", self.bin)):
+            if value is not None:
                 entry[key] = value
         if self.has_bin and self.bin is None:
             entry["hasBin"] = True
@@ -108,7 +117,7 @@ class Graph:
     #: `optionalDependencies`), by importer path, the project first.
     importers: dict[str, dict[str, dict[str, Ref]]]
     #: How a version is named in `versions`, from a dependency's name and ref.
-    key: Any
+    key: Callable[[str, Ref], str]
 
     def target(self, importer: str, name: str, ref: Ref) -> str:
         """A version's key, or the member a link names as `link:<path>`."""
@@ -149,7 +158,7 @@ def lookup(layout: dict[str, str], path: str, name: str) -> str | None:
     return None
 
 
-def hoist(graph: Graph, directory: str, scripted: set[str]) -> dict[str, dict[str, Any]]:
+def hoist(graph: Graph, directory: str, scripted: set[str]) -> dict[str, Entry]:
     """Place every version as npm does, and give the result as npm's `packages`.
 
     A version goes to the top `node_modules` unless another version of that
@@ -158,7 +167,7 @@ def hoist(graph: Graph, directory: str, scripted: set[str]) -> dict[str, dict[st
     every `require` resolved before still resolves the same way.
     """
     layout: dict[str, str] = {}
-    packages: dict[str, dict[str, Any]] = {}
+    packages: dict[str, Entry] = {}
     queue: list[tuple[str, str, dict[str, Ref]]] = []
     for importer, kinds in graph.importers.items():
         packages[importer] = importer_entry(directory, importer, kinds)
@@ -189,13 +198,13 @@ def hoist(graph: Graph, directory: str, scripted: set[str]) -> dict[str, dict[st
             queue.append((place, "", version.dependencies | version.optional))
     # npm links every workspace member at the top, needed or not.
     for member in graph.importers:
-        name = packages[member].get("name")
-        if member and name and f"node_modules/{name}" not in layout:
-            packages[f"node_modules/{name}"] = {"resolved": member, "link": True}
+        member_name = packages[member].get("name")
+        if member and member_name and f"node_modules/{member_name}" not in layout:
+            packages[f"node_modules/{member_name}"] = {"resolved": member, "link": True}
     return dict(sorted(packages.items()))
 
 
-def mark(packages: dict[str, dict[str, Any]]) -> None:
+def mark(packages: dict[str, Entry]) -> None:
     """Set npm's `dev` and `optional` on each package, from what reaches it.
 
     `dev`: no path from a production dependency of an importer reaches it.
@@ -249,9 +258,10 @@ def pnpm_key(name: str, ref: Ref) -> str:
     return f"{name}@{ref}"
 
 
-def pnpm_resolved(name: str, version: str, resolution: dict[str, Any]) -> str:
+def pnpm_resolved(name: str, version: str, resolution: Document) -> str:
     if "tarball" in resolution:
-        return resolution["tarball"]
+        tarball: str = resolution["tarball"]
+        return tarball
     if resolution.get("type") == "git":
         repo = resolution["repo"].removeprefix("git+")
         return f"git+{repo}#{resolution['commit']}"
@@ -260,13 +270,22 @@ def pnpm_resolved(name: str, version: str, resolution: dict[str, Any]) -> str:
     return registry_url(name, version)
 
 
-def read_pnpm(directory: str, data: dict[str, Any]) -> tuple[Graph, set[str]]:
+def pnpm_importer(importer: Document) -> dict[str, dict[str, Ref]]:
+    """An importer's locked versions, by kind."""
+    kinds: dict[str, dict[str, Ref]] = {}
+    for kind in ("dependencies", "devDependencies", "optionalDependencies"):
+        specs: dict[str, Document] = importer.get(kind) or {}
+        kinds[kind] = {name: spec["version"] for name, spec in specs.items()}
+    return kinds
+
+
+def read_pnpm(directory: str, data: Document) -> tuple[Graph, set[str]]:
     version = str(data.get("lockfileVersion", ""))
     if not version.startswith("9."):
         raise SystemExit(
             f"pydd.node.npm: pnpm-lock.yaml has version {version}. pydd reads version 9, of pnpm 9 and later."
         )
-    settings: dict[str, Any] = {}
+    settings: Document = {}
     workspace = Path(directory, "pnpm-workspace.yaml")
     if workspace.is_file():
         import yaml
@@ -275,10 +294,11 @@ def read_pnpm(directory: str, data: dict[str, Any]) -> tuple[Graph, set[str]]:
     root = manifest(directory, "").get("pnpm", {})
     # The lock holds only each patch's hash; the project names its file.
     patches: dict[str, str] = root.get("patchedDependencies", {}) | (settings.get("patchedDependencies") or {})
-    patched = data.get("patchedDependencies") or {}
-    metadata = data.get("packages") or {}
-    versions = {}
-    for key, snapshot in (data.get("snapshots") or {}).items():
+    patched: Document = data.get("patchedDependencies") or {}
+    metadata: dict[str, Document] = data.get("packages") or {}
+    snapshots: dict[str, Document] = data.get("snapshots") or {}
+    versions: dict[str, Version] = {}
+    for key, snapshot in snapshots.items():
         name, ref = split_id(key)
         meta = metadata[f"{name}@{peel(ref)}"]
         listed = lambda value: [value] if isinstance(value, str) else value  # noqa: E731
@@ -301,29 +321,24 @@ def read_pnpm(directory: str, data: dict[str, Any]) -> tuple[Graph, set[str]]:
             ),
             resolved=pnpm_resolved(name, peel(ref), meta["resolution"]),
             integrity=meta["resolution"].get("integrity"),
-            dependencies={dep: ref for dep, ref in (snapshot.get("dependencies") or {}).items()},
-            optional={dep: ref for dep, ref in (snapshot.get("optionalDependencies") or {}).items()},
+            dependencies=dict(snapshot.get("dependencies") or {}),
+            optional=dict(snapshot.get("optionalDependencies") or {}),
             os=listed(meta.get("os")),
             cpu=listed(meta.get("cpu")),
             libc=listed(meta.get("libc")),
             has_bin=bool(meta.get("hasBin")),
             patch=patch,
         )
-    importers = {}
-    for path, importer in sorted((data.get("importers") or {}).items(), key=lambda item: item[0] != "."):
-        importers["" if path == "." else path] = {
-            kind: {name: spec["version"] for name, spec in (importer.get(kind) or {}).items()}
-            for kind in ("dependencies", "devDependencies", "optionalDependencies")
-        }
-    graph = Graph(versions, importers, lambda name, ref: pnpm_key(name, ref))
+    importers: dict[str, dict[str, dict[str, Ref]]] = {}
+    locked: dict[str, Document] = data.get("importers") or {}
+    for path, importer in sorted(locked.items(), key=lambda item: item[0] != "."):
+        importers["" if path == "." else path] = pnpm_importer(importer)
+    graph = Graph(versions, importers, pnpm_key)
     built = set(root.get("onlyBuiltDependencies", []))
     built |= set(settings.get("onlyBuiltDependencies", []))
     # pnpm 11: `allowBuilds`, by name or by `name@version`.
-    built |= {
-        split_id(spec)[0] if "@" in spec[1:] else spec
-        for spec, allowed in (settings.get("allowBuilds") or {}).items()
-        if allowed is True
-    }
+    allow: dict[str, object] = settings.get("allowBuilds") or {}
+    built |= {split_id(spec)[0] if "@" in spec[1:] else spec for spec, allowed in allow.items() if allowed is True}
     return graph, built
 
 
@@ -347,7 +362,7 @@ BUN_LOCK_VERSIONS = (0, 1)
 """The `bun.lock` versions this reader knows; another one is refused, not misread."""
 
 
-def read_bun(directory: str, text: str) -> tuple[dict[str, dict[str, Any]], set[str]]:
+def read_bun(directory: str, text: str) -> tuple[dict[str, Entry], set[str]]:
     # bun writes JSON with trailing commas.
     data = json.loads(re.sub(r",(\s*[}\]])", r"\1", text))
     version = data.get("lockfileVersion")
@@ -355,9 +370,9 @@ def read_bun(directory: str, text: str) -> tuple[dict[str, dict[str, Any]], set[
         raise SystemExit(
             f"pydd.node.npm: bun.lock has version {version}. pydd reads versions 0 and 1, of bun 1.2 and later."
         )
-    workspaces: dict[str, dict[str, Any]] = data["workspaces"]
+    workspaces: dict[str, Document] = data["workspaces"]
     members = {meta["name"]: path for path, meta in workspaces.items() if path}
-    packages: dict[str, dict[str, Any]] = {}
+    packages: dict[str, Entry] = {}
     for path, meta in workspaces.items():
         packages[path] = importer_entry(
             directory,
@@ -374,7 +389,7 @@ def read_bun(directory: str, text: str) -> tuple[dict[str, dict[str, Any]], set[
         if len(value) != 4 or not isinstance(value[1], str):
             raise SystemExit(f"pydd.node.npm: bun.lock gives {key} as {value[0]}. pydd reads packages from a registry.")
         _, registry, meta, integrity = value
-        entry: dict[str, Any] = {
+        entry: Entry = {
             "name": name,
             "version": ref,
             "resolved": registry_url(name, ref, registry or REGISTRY),
@@ -392,10 +407,10 @@ def read_bun(directory: str, text: str) -> tuple[dict[str, dict[str, Any]], set[
     return dict(sorted(packages.items())), trusted
 
 
-def parse_yarn(text: str) -> dict[str, dict[str, Any]]:
+def parse_yarn(text: str) -> dict[str, Document]:
     """A Yarn v1 lock as a map from each of its `name@range` keys to its block."""
-    blocks: dict[str, dict[str, Any]] = {}
-    current: dict[str, Any] = {}
+    blocks: dict[str, Document] = {}
+    current: Document = {}
     section: dict[str, str] | None = None
 
     def unquote(word: str) -> str:
@@ -432,7 +447,7 @@ def read_yarn(directory: str, text: str) -> Graph:
     root = manifest(directory, "")
     patterns = root.get("workspaces", [])
     patterns = patterns.get("packages", []) if isinstance(patterns, dict) else patterns
-    members = {}
+    members: dict[str, str] = {}
     for pattern in patterns:
         for found in sorted(Path(directory).glob(pattern)):
             if (found / "package.json").is_file():
@@ -455,7 +470,7 @@ def read_yarn(directory: str, text: str) -> Graph:
             for name, spec in deps.items()
         }
 
-    versions = {}
+    versions: dict[str, Version] = {}
     for spec, block in blocks.items():
         if first[id(block)] != spec:
             continue
@@ -471,7 +486,7 @@ def read_yarn(directory: str, text: str) -> Graph:
             # Yarn v1 records no programs, so the node reads them from the package.
             has_bin=True,
         )
-    importers = {}
+    importers: dict[str, dict[str, dict[str, Ref]]] = {}
     for path in ["", *sorted(members.values())]:
         data = manifest(directory, path)
         importers[path] = {
@@ -482,7 +497,7 @@ def read_yarn(directory: str, text: str) -> Graph:
 
 def read(
     directory: str, lock: str, scripts: Iterable[str] = (), members: Iterable[str] | None = None
-) -> dict[str, dict[str, Any]]:
+) -> dict[str, Entry]:
     """The `packages` of an npm lock, from a lock of another tool in `directory`.
 
     `scripts` names more packages whose install scripts run. A graph lock

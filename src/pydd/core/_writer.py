@@ -156,8 +156,8 @@ class RecursiveWriter:
         # The darwin sandbox cannot read a path the build added: Nix fixes its
         # profile at the start, and mounts added paths only on Linux.
         if (drv := self.added.get(path)) is not None:
-            with open(os.environ["out"], "w", encoding="utf-8") as sink:  # noqa: SIM112 - Nix names it `out`
-                sink.write(aterm(drv, self.store))
+            with open(os.environ["out"], "w", encoding="utf-8") as text_sink:  # noqa: SIM112 - Nix names it `out`
+                text_sink.write(aterm(drv, self.store))
             return
         # recursive-nix on Linux puts each path the build added into its sandbox.
         with open(path, "rb") as source, open(os.environ["out"], "wb") as sink:  # noqa: SIM112 - Nix names it `out`

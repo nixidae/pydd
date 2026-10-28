@@ -48,11 +48,11 @@ print("\\n" + json.dumps(list(function(settings)) if function else []))
 def unpack(archive: str, into: Path) -> Path:
     """Unpack a source distribution, and return its one top directory."""
     if archive.endswith(".zip"):
-        with zipfile.ZipFile(archive) as handle:
-            handle.extractall(into)
+        with zipfile.ZipFile(archive) as zip_file:
+            zip_file.extractall(into)
     else:
-        with tarfile.open(archive) as handle:
-            handle.extractall(into, filter="data")
+        with tarfile.open(archive) as tar_file:
+            tar_file.extractall(into, filter="data")
     tops = list(into.iterdir())
     if len(tops) != 1 or not tops[0].is_dir():
         raise RuntimeError(f"{archive} holds {len(tops)} entries at its top, and an sdist holds one directory")

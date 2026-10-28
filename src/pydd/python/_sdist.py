@@ -63,11 +63,11 @@ def has_native_sources(source: str | Path) -> bool:
     if path.is_dir():
         names = [str(member) for member in path.rglob("*")]
     elif path.name.endswith(".zip"):
-        with zipfile.ZipFile(path) as archive_file:
-            names = archive_file.namelist()
+        with zipfile.ZipFile(path) as zip_file:
+            names = zip_file.namelist()
     else:
-        with tarfile.open(path) as archive_file:
-            names = archive_file.getnames()
+        with tarfile.open(path) as tar_file:
+            names = tar_file.getnames()
     return any(PurePosixPath(name).suffix in NATIVE_SUFFIXES for name in names)
 
 
@@ -80,16 +80,16 @@ def read_pyproject(archive: str | Path, subdirectory: str = "") -> dict[str, Any
     """
     path = Path(archive)
     if path.name.endswith(".zip"):
-        with zipfile.ZipFile(path) as archive_file:
-            for name in archive_file.namelist():
+        with zipfile.ZipFile(path) as zip_file:
+            for name in zip_file.namelist():
                 if is_pyproject(name, subdirectory):
-                    return tomllib.loads(archive_file.read(name).decode())
+                    return tomllib.loads(zip_file.read(name).decode())
         return {}
 
-    with tarfile.open(path) as archive_file:
-        for member in archive_file.getmembers():
+    with tarfile.open(path) as tar_file:
+        for member in tar_file.getmembers():
             if is_pyproject(member.name, subdirectory):
-                handle = archive_file.extractfile(member)
+                handle = tar_file.extractfile(member)
                 if handle is None:
                     raise RuntimeError(f"{path}: '{member.name}' is not a regular file")
                 with handle:

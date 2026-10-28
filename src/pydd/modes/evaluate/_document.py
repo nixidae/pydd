@@ -74,6 +74,6 @@ def submit_evaluated(writer: HuggormWriter, document: dict[str, Any], graph_nix:
 
     # The store path of the `.drv` that the evaluator wrote. It is not an
     # output path: this build cannot realise anything.
-    root_drv = writer.store.print_store_path(root.drv_path())
+    root_drv: str = writer.store.print_store_path(root.drv_path())
     print(f"==> the evaluator wrote {root_drv}", file=sys.stderr)
     return root_drv
