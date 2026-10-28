@@ -51,7 +51,7 @@ let
     unique
     ;
 
-  packages = lock.packages;
+  inherit (lock) packages;
   entryOf = path: packages.${path};
 
   # `pydd.node._npm` has each of these, under the same name.
@@ -381,7 +381,7 @@ let
     let
       entry = entryOf path;
       replaced = (menu.native.${name_of path entry} or { }).src or null;
-      resolved = entry.resolved;
+      inherit (entry) resolved;
       version = entry.version or "0";
       key = "${name_of path entry}-${version}";
     in
@@ -469,7 +469,7 @@ let
         inherit tree;
         links = if scripted then bin_links (deps ++ [ path ]) else { };
         nested = filter (other: tree ? ${other}) (nested path);
-        nodejs = menu.nodejs;
+        inherit (menu) nodejs;
       };
     in
     derivation (

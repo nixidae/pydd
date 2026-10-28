@@ -15,7 +15,7 @@ let
       # scoped package `@scope/tool` gives `scope-tool`.
       name ? lib.replaceStrings [ "@" "/" ] [ "" "-" ] (
         manifest.name
-          or (throw ("pydd.node.npm: ${toString project}/package.json names no package. Pass `name`."))
+          or (throw "pydd.node.npm: ${toString project}/package.json names no package. Pass `name`.")
       ),
       # The program that `meta.mainProgram` names, or `null`. By default the
       # program of the project's own name, or its only program.

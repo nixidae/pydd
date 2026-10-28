@@ -320,7 +320,7 @@ let
     else
       file
       // {
-        package = (builtins.head rows).package;
+        inherit ((builtins.head rows)) package;
         version = builtins.head versions;
         kind = if pkgs.lib.hasSuffix ".whl" file.filename then "wheel" else "sdist";
       }
@@ -441,14 +441,12 @@ let
         # `_hook.py` makes the backend's venv with it.
         (scriptDir + "/make-venv.py")
         ../../src/pydd/modes/__init__.py
-        (
-          {
-            nix = ../../src/pydd/modes/evaluate;
-            nix-cli = ../../src/pydd/modes/nix_cli;
-            python = ../../src/pydd/modes/render;
-          }
-          .${render}
-        )
+        {
+          nix = ../../src/pydd/modes/evaluate;
+          nix-cli = ../../src/pydd/modes/nix_cli;
+          python = ../../src/pydd/modes/render;
+        }
+        .${render}
       ]
       ++ pkgs.lib.optional (protocol == "out") ../../src/pydd/modes/out;
     };
@@ -695,7 +693,7 @@ let
 
   targetEnv = {
     PYDD_TARGET = builtins.toJSON {
-      pythonVersion = python.pythonVersion;
+      inherit (python) pythonVersion;
       # `cp313t` for a free-threaded build. `abi3` and `none` are left to
       # `packaging`, which adds them when the ABI allows.
       abis = builtins.filter (tag: tag != "abi3" && tag != "none") python.pythonABITags;
@@ -709,7 +707,7 @@ let
       # The oldest macOS that the target's binaries run on.
       macosVersion = if hostPlatform.isDarwin then hostPlatform.darwinMinVersion else "";
       # The newest manylinux or musllinux tag that runs here.
-      libc = hostPlatform.libc;
+      inherit (hostPlatform) libc;
       libcVersion = if hostPlatform.isLinux then pkgs.stdenv.cc.libc.version else "";
       markers = targetMarkers // markers;
     };
@@ -796,7 +794,7 @@ let
           # An archive of a `path` source needs no download, and the string that
           # `uv.nix` wrote already carries the context of the file. Nix makes
           # that file an input source of this planner in the same way.
-          PYDD_SDIST = if entry ? path then entry.path else entry.drv;
+          PYDD_SDIST = entry.path or entry.drv;
 
           # **The menu is the same for every planner of one level, so it is
           # serialised once for that level and not once for each planner.**

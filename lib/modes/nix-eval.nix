@@ -75,8 +75,7 @@ let
       "${builtins.storePath parts.top}${parts.sub}"
     else
       data;
-in
-let
+
   plan = value (builtins.fromJSON (builtins.readFile document));
   pkgs = import nixpkgs {
     inherit (plan) system;

@@ -620,7 +620,7 @@ let
   # One entry for each package that this reader builds from a tree.
   uvEditables = lib.listToAttrs (
     map (package: {
-      name = package.name;
+      inherit (package) name;
       value =
         if isGit package then
           {
@@ -699,15 +699,11 @@ let
   #   sdist = { hash = "sha256:c5d576a0..." }
   artifactUrl =
     package: file:
-    if file ? url then
-      file.url
-    else if package.source ? url then
-      package.source.url
-    else
-      throw (
-        "uv.nix: '${package.name}' names an artefact with no url and no path, and its source "
-        + "gives neither. Every artefact of uv.lock names one of the two."
-      );
+    file.url or (package.source.url or (throw (
+      "uv.nix: '${package.name}' names an artefact with no url and no path, and its source "
+      + "gives neither. Every artefact of uv.lock names one of the two."
+    ))
+    );
 
   # **A file of this machine reaches the menu without a fetch.** uv writes the
   # location of such a file in one of two places, and `WheelWireSource` of uv
@@ -761,10 +757,8 @@ let
         )
       else
         joinPath directory file.path
-    else if package.source ? path then
-      package.source.path
     else
-      null;
+      package.source.path or null;
   isLocal = package: file: localRelative package file != null;
 
   # **`builtins.path` names the one file, and not the directory that holds
@@ -786,12 +780,12 @@ let
   # `pydd.python._uvlock.File.name` reads the same keys.
   fileName =
     package: file:
-    if file ? filename then
-      file.filename
-    else if isLocal package file then
-      baseNameOf (localRelative package file)
-    else
-      lib.last (lib.splitString "/" (artifactUrl package file));
+    file.filename or (
+      if isLocal package file then
+        baseNameOf (localRelative package file)
+      else
+        lib.last (lib.splitString "/" (artifactUrl package file))
+    );
 
   # One entry of the menu. **No filter and no preference apply here.** Every
   # wheel of every package becomes an entry, and the planner picks among them
@@ -924,11 +918,9 @@ checkProject (
           "uv.nix: fromSdist names ${builtins.toJSON (lib.subtractLists localNames chosenFromSdist)}, "
           + "and ${lockFile} holds no local package of that name. It holds ${builtins.toJSON localNames}."
         )
-        (
-          # **`lockCheck` is here whatever `uvCheck` says**, and Nix evaluates it
-          # only when something asks for it. So `nix build --file ./uv.nix
-          # lockCheck` runs uv over the project and builds no graph.
-          root
-        )
+        # **`lockCheck` is here whatever `uvCheck` says**, and Nix evaluates it
+        # only when something asks for it. So `nix build --file ./uv.nix
+        # lockCheck` runs uv over the project and builds no graph.
+        root
     )
 )

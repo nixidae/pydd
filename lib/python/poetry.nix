@@ -152,9 +152,8 @@ let
       inherit groups extras;
     };
   };
-in
-# An ordinary derivation, as `./uv.nix` gives it (nixidae/nixidae#788).
-let
+
+  # An ordinary derivation, as `./uv.nix` gives it (nixidae/nixidae#788).
   root = import ../core/root.nix {
     inherit pkgs;
     name = environmentName;

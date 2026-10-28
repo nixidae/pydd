@@ -319,86 +319,74 @@ rec {
       }
     )
     // {
-      out = (
-        import ./tests/projects {
-          inherit pkgs;
-          pydd = callLib {
-            huggorm = huggormReleased;
-            nix = nixReleased;
-            writer = "huggorm";
-            plannerProtocol = "out";
-          };
-        }
-      );
+      out = import ./tests/projects {
+        inherit pkgs;
+        pydd = callLib {
+          huggorm = huggormReleased;
+          nix = nixReleased;
+          writer = "huggorm";
+          plannerProtocol = "out";
+        };
+      };
       # recursive-nix with EnsurePath used: a stock `nix eval` evaluates
       # graph.nix in the planner, with `builtins.storePath` and
       # `builtins.appendContext`. No huggorm, and no renderer.
-      recursive-eval = (
-        import ./tests/projects {
-          inherit pkgs;
-          pydd = callLib {
-            huggorm = huggormReleased;
-            nix = nixReleased;
-            writer = "cli";
-            plannerProtocol = "recursive";
-            plannerRender = "nix-cli";
-          };
-        }
-      );
+      recursive-eval = import ./tests/projects {
+        inherit pkgs;
+        pydd = callLib {
+          huggorm = huggormReleased;
+          nix = nixReleased;
+          writer = "cli";
+          plannerProtocol = "recursive";
+          plannerRender = "nix-cli";
+        };
+      };
       # recursive-eval, with nixpkgs in the planner: a source build is a
       # `stdenv.mkDerivation`. Its environments differ from every other mode's.
-      recursive-nixpkgs = (
-        import ./tests/projects {
-          inherit pkgs;
-          pydd = callLib {
-            huggorm = huggormReleased;
-            nix = nixReleased;
-            writer = "cli";
-            plannerProtocol = "recursive";
-            plannerRender = "nix-cli";
-            plannerNixpkgs = pkgs.path;
-          };
-        }
-      );
+      recursive-nixpkgs = import ./tests/projects {
+        inherit pkgs;
+        pydd = callLib {
+          huggorm = huggormReleased;
+          nix = nixReleased;
+          writer = "cli";
+          plannerProtocol = "recursive";
+          plannerRender = "nix-cli";
+          plannerNixpkgs = pkgs.path;
+        };
+      };
       # stdenv as data on builder-rpc-v0: the host evaluates
       # `stdenv.mkDerivation` once, and a planner with no nixpkgs writes the
       # node it would write. Through the Python renderer, with `nix`.
-      stdenv = (
-        import ./tests/projects {
-          inherit pkgs;
-          pydd = callLib {
-            inherit huggorm nix;
-            writer = "cli";
-            plannerStdenv = pkgs;
-          };
-        }
-      );
+      stdenv = import ./tests/projects {
+        inherit pkgs;
+        pydd = callLib {
+          inherit huggorm nix;
+          writer = "cli";
+          plannerStdenv = pkgs;
+        };
+      };
       # stdenv as data on released Nix, with no socket at all.
-      out-stdenv = (
-        import ./tests/projects {
-          inherit pkgs;
-          pydd = callLib {
-            huggorm = huggormReleased;
-            nix = nixReleased;
-            writer = "huggorm";
-            plannerProtocol = "out";
-            plannerStdenv = pkgs;
-          };
-        }
-      );
+      out-stdenv = import ./tests/projects {
+        inherit pkgs;
+        pydd = callLib {
+          huggorm = huggormReleased;
+          nix = nixReleased;
+          writer = "huggorm";
+          plannerProtocol = "out";
+          plannerStdenv = pkgs;
+        };
+      };
       # Stock 2.35 with recursive-nix: the planner writes through the build's
       # daemon socket, with the release's own `nix`, and its root to `$out`.
-      recursive = (
-        import ./tests/projects {
-          inherit pkgs;
-          pydd = callLib {
-            huggorm = huggormReleased;
-            nix = nixReleased;
-            writer = "cli";
-            plannerProtocol = "recursive";
-          };
-        }
-      );
+      recursive = import ./tests/projects {
+        inherit pkgs;
+        pydd = callLib {
+          huggorm = huggormReleased;
+          nix = nixReleased;
+          writer = "cli";
+          plannerProtocol = "recursive";
+        };
+      };
     };
 
   # Real uv projects from GitHub, as they are: `tests/live`.

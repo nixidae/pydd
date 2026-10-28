@@ -53,7 +53,7 @@ let
   # An artefact that carries a `path` is already present, because some
   # derivation named it as an input. A planner of one source distribution
   # receives its own archive that way, and needs no fetch for it.
-  fetched = artifact: if artifact ? path then artifact.path else artifact.out;
+  fetched = artifact: artifact.path or artifact.out;
 
   # Every node floats. A floating output has no path until the build gives it
   # one, so a node that reads another node interpolates a placeholder, and
@@ -172,7 +172,7 @@ let
       // (
         if node.overrides.fixup or true then
           {
-            fixupElf = script.fixupElf;
+            inherit (script) fixupElf;
             fixupPaths = join ":" (root: "${root}/lib");
             patchelf = "${tool.patchelf}/bin/patchelf";
           }
@@ -277,7 +277,7 @@ let
       # The bootstrap. Nothing can install the installer, so its node unzips
       # the wheel and puts it on a path.
       mk {
-        name = node.name;
+        inherit (node) name;
         args = [
           "-c"
           ". ${script.unpackWheel}"
@@ -287,7 +287,7 @@ let
     else if node.kind == "wheel" then
       mk (
         {
-          name = node.name;
+          inherit (node) name;
           args = [
             "-c"
             ". ${script.installWheel}"
@@ -302,14 +302,14 @@ let
         // (if node.platform then patchelfInputs else { })
       )
     else if node.kind == "editable" then
-      mkSource node ({
-        name = node.name;
+      mkSource node {
+        inherit (node) name;
         args = [
           "-c"
           ''exec "${python}" "${script.buildLocal}"''
         ];
         mode = "editable";
-        source = node.source;
+        inherit (node) source;
         subdirectory = node.subdirectory or "";
         # A literal path names one tree forever. A reference to a variable is
         # the same bytes for every tree, so one environment reads whichever
@@ -318,7 +318,7 @@ let
         inherit installerPath;
         inherit (node) backend;
         backendPath = builtins.concatStringsSep ":" (map sitePath node.backendPath);
-      })
+      }
     else if node.kind == "local-wheel" then
       # **A wheel out of a tree, with no archive between the two.** This is what
       # `pip install .` does, and what a git source of `uv.lock` needs: a
@@ -329,19 +329,19 @@ let
       # the difference between this node and a node of kind `editable`, and it
       # is the difference that `uv` makes between a git source and a workspace
       # member.
-      mkSource node ({
-        name = node.name;
+      mkSource node {
+        inherit (node) name;
         args = [
           "-c"
           ''exec "${python}" "${script.buildLocal}"''
         ];
         mode = "wheel";
-        source = node.source;
+        inherit (node) source;
         subdirectory = node.subdirectory or "";
         inherit installerPath;
         inherit (node) backend;
         backendPath = builtins.concatStringsSep ":" (map sitePath node.backendPath);
-      })
+      }
     else if node.kind == "local-sdist" then
       # **The distribution of a local project, as its own store object.** This
       # is what `uv build` writes and what an index serves. The node runs one
@@ -352,18 +352,18 @@ let
       # that a project ships, so it is worth a store path that a reader can
       # open. It also makes the failure legible: an archive that leaves a file
       # out fails in the node below this one, and this node still succeeded.
-      mkSource node ({
-        name = node.name;
+      mkSource node {
+        inherit (node) name;
         args = [
           "-c"
           ''exec "${python}" "${script.buildLocal}"''
         ];
         mode = "sdist";
-        source = node.source;
+        inherit (node) source;
         subdirectory = node.subdirectory or "";
         inherit (node) backend;
         backendPath = builtins.concatStringsSep ":" (map sitePath node.backendPath);
-      })
+      }
     else if node.kind == "sdist" then
       # **A node of this kind is a planner, and not a build.** The build system
       # of a source distribution is declared inside the archive, and no
@@ -392,8 +392,8 @@ let
     else if node.kind == "sdist-build" then
       # What the planner above decided: run one PEP 517 hook, with a backend
       # that is another node of the graph that the planner submitted.
-      mkSource node ({
-        name = node.name;
+      mkSource node {
+        inherit (node) name;
         args = [
           "-c"
           ". ${script.buildSdist}"
@@ -415,7 +415,7 @@ let
         # from nowhere else. `built.${name}` is a derivation of this same
         # evaluation, so the dependency is real and the order is right.
         backendPath = builtins.concatStringsSep ":" (map sitePath node.backendPath);
-      })
+      }
     else if node.kind == "nixpkgs" then
       # **This node builds nothing, and that is the whole point.** nixpkgs
       # already built the package for this system, so the graph takes the store
@@ -441,7 +441,7 @@ let
       # sites, so a planner that takes it has the backend built and can ask
       # its `get_requires_for_build_*` (nixidae/nixidae#847).
       mk {
-        name = node.name;
+        inherit (node) name;
         args = [
           "-c"
           ''echo "$backendPath" > "$out"''
@@ -453,7 +453,7 @@ let
       # merged into it. `make-venv.py` runs under the interpreter that the
       # environment is for, which is what `EnvBuilder` takes as its base.
       mk {
-        name = node.name;
+        inherit (node) name;
         args = [
           "-c"
           ''exec "${python}" "${script.makeVenv}"''
@@ -467,7 +467,7 @@ let
       # package is the template of the shape. `make-application.py` gives the
       # whole reason, and `pyproject.nix` gives the idea.
       mk {
-        name = node.name;
+        inherit (node) name;
         args = [
           "-c"
           ''exec "${python}" "${script.makeApplication}"''

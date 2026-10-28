@@ -239,11 +239,11 @@ in
           */
           overrideAttrs = f: result (attrs // f attrs);
           # What the planner runs on, as one derivation, for copying to a store.
-          closure = linkFarmFromDrvs "${name}-planner-closure" ([
+          closure = linkFarmFromDrvs "${name}-planner-closure" [
             bash
             venv
             (if writer == "drv" then pyddDrv else nix)
-          ]);
+          ];
         };
     in
     result attributes;

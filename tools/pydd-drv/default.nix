@@ -12,7 +12,7 @@
 }:
 stdenv.mkDerivation {
   pname = "pydd-drv";
-  version = nix-store.version;
+  inherit (nix-store) version;
   src = lib.fileset.toSource {
     root = ./.;
     fileset = lib.fileset.unions [

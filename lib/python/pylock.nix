@@ -92,12 +92,8 @@ let
 
   fileName =
     entry:
-    if entry ? name then
-      entry.name
-    else if entry ? path then
-      baseNameOf entry.path
-    else
-      lib.last (lib.splitString "/" entry.url);
+    entry.name
+      or (if entry ? path then baseNameOf entry.path else lib.last (lib.splitString "/" entry.url));
 
   # PEP 751 writes a table of algorithm to digest, and `fetchurl` takes one.
   hashOf =
@@ -118,7 +114,7 @@ let
   localFile =
     entry:
     let
-      relative = if entry ? path then entry.path else lib.removePrefix fileScheme entry.url;
+      relative = entry.path or (lib.removePrefix fileScheme entry.url);
     in
     builtins.path {
       path = if lib.hasPrefix "/" relative then /. + relative else project + "/${relative}";

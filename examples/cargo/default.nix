@@ -13,7 +13,7 @@ demo
 // {
   # The binary, run; and the project's own tests, one node for each test
   # binary and one for the doctests.
-  check = runCommand "cargo-demo-check" { tests = demo.tests; } ''
+  check = runCommand "cargo-demo-check" { inherit (demo) tests; } ''
     ${demo}/bin/cargo-demo > $out
     ls $tests >> $out
   '';
