@@ -4,9 +4,10 @@
   # `--argstr system aarch64-darwin` on dynhetz reaches the MacBook while
   # it is registered with pynixd.
   system ? builtins.currentSystem,
-  huggormSet ? import sources.huggorm { inherit sources system; },
-  # huggorm's package set, so the bindings and the planners share one Python.
-  pkgs ? huggormSet.pkgs,
+  # The nixpkgs huggorm takes too, so the bindings and the planners share one
+  # Python.
+  pkgs ? import sources.nixpkgs { inherit system; },
+  huggormSet ? import sources.huggorm { inherit pkgs sources; },
 }:
 let
   inherit (pkgs) lib;

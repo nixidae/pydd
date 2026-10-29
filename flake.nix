@@ -27,13 +27,10 @@
         system:
         import ./. {
           inherit sources;
-          huggormSet = import sources.huggorm {
-            inherit sources;
-            pkgs = import sources.nixpkgs {
-              inherit system;
-              config = { };
-              overlays = [ ];
-            };
+          pkgs = import sources.nixpkgs {
+            inherit system;
+            config = { };
+            overlays = [ ];
           };
         }
       );
