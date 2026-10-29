@@ -12,6 +12,13 @@ it. These pages hold what the work found.
 
 ```{toctree}
 :maxdepth: 2
+:caption: Use
+
+getting-started
+```
+
+```{toctree}
+:maxdepth: 2
 :caption: Findings
 
 modes
