@@ -211,7 +211,7 @@ A program's `#!/usr/bin/env node` becomes the path of Node, as stdenv's
 ## The modes
 
 Each project of `tests/node` gives one result in five modes:
-`nix run --file . test-node`.
+`nix run --file . internal.test-node`.
 
 | mode | Nix | writes through |
 | --- | --- | --- |

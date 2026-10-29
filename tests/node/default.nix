@@ -1,6 +1,6 @@
 # npm projects, each with a check that runs what it built.
 #
-#     nix run --file . run -- node.cli.hello-npm
+#     nix run --file . internal.run -- node.cli.hello-npm
 { pkgs, pydd }:
 let
   projects = {

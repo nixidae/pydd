@@ -2,7 +2,7 @@
 # what a lock file in the wild needs. Each entry says what, if anything, it
 # needs beyond the project itself.
 #
-#     nix run --file . run -- live.cli.uv-fastapi-example
+#     nix run --file . internal.run -- live.cli.uv-fastapi-example
 { pkgs, pydd }:
 let
   github =

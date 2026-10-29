@@ -15,7 +15,7 @@ would silently become a different derivation.
 
 From the top of the repository:
 
-    nix run --file . run-released -- examples.released.huggorm
+    nix run --file . internal.run-released -- examples.released.huggorm
 
 It builds with stock Nix 2.35, in a private store, and prints:
 

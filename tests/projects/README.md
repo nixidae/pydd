@@ -9,15 +9,15 @@ nanopynix, with the text that the lab wrote for them.
 private store of `run`, because a check needs `builder-rpc-v0`:
 
 ```console
-$ nix run --file . test-projects
-$ nix run --file . test-projects -- pure-app git-app
-$ nix run --file . run -- projects.pure-app
+$ nix run --file . internal.test-projects
+$ nix run --file . internal.test-projects -- pure-app git-app
+$ nix run --file . internal.run -- projects.pure-app
 ```
 
 `default.nix` here names each check and its arguments.
 
 **Use the `uv` of the pinned nixpkgs**, so every reader gets the same `uv`.
-Each command below writes `nix run --file . pkgs.uv --` from the top of
+Each command below writes `nix run --file . internal.pkgs.uv --` from the top of
 the repository.
 
 ## Edit a `pyproject.toml`, and run `uv lock` again
@@ -54,7 +54,7 @@ dynamically linked executable for a generic Linux. NixOS refuses to start it.
 So name an interpreter of nixpkgs, and stop the download:
 
 ```console
-$ py=$(nix build --file . pkgs.python313 --no-link --print-out-paths)
+$ py=$(nix build --file . internal.pkgs.python313 --no-link --print-out-paths)
 $ export UV_PYTHON_DOWNLOADS=never UV_PYTHON="$py/bin/python3.13"
 ```
 
@@ -97,11 +97,11 @@ the graph runs `auto-patchelf`, and the dependency chain has three levels:
 `pure-app` -> `rich` -> `markdown-it-py` -> `mdurl`.
 
 ```console
-$ nix run --file . pkgs.uv -- init --app --no-package --name pure-app \
+$ nix run --file . internal.pkgs.uv -- init --app --no-package --name pure-app \
     --python 3.13 --no-workspace --vcs none pure-app
 $ cd pure-app
-$ nix run --file . pkgs.uv -- add --no-sync rich
-$ nix run --file . pkgs.uv -- add --no-sync --group build installer
+$ nix run --file . internal.pkgs.uv -- add --no-sync rich
+$ nix run --file . internal.pkgs.uv -- add --no-sync --group build installer
 ```
 
 Three parts of those commands matter:
@@ -131,11 +131,11 @@ The second project. It installs itself, `hatchling` builds it, and one of its
 dependencies builds from a source distribution.
 
 ```console
-$ nix run --file . pkgs.uv -- init --lib --package --build-backend hatch \
+$ nix run --file . internal.pkgs.uv -- init --lib --package --build-backend hatch \
     --name packaged-app --python 3.13 --no-workspace --vcs none packaged-app
 $ cd packaged-app
-$ nix run --file . pkgs.uv -- add --no-sync rich
-$ nix run --file . pkgs.uv -- add --no-sync --group build \
+$ nix run --file . internal.pkgs.uv -- add --no-sync rich
+$ nix run --file . internal.pkgs.uv -- add --no-sync --group build \
     hatchling installer flit-core
 ```
 
@@ -178,7 +178,7 @@ distribution, which is the file that an index serves and the only form that
 reaches a user who does not have the tree.
 
 ```console
-$ nix run --file . pkgs.uv -- build --sdist
+$ nix run --file . internal.pkgs.uv -- build --sdist
 Successfully built dist/packaged_app-0.1.0.tar.gz
 ```
 
@@ -222,16 +222,16 @@ The third project. It is a uv workspace: one lock file, one virtual root, and
 two members that install.
 
 ```console
-$ nix run --file . pkgs.uv -- init --app --no-package --name workspace-root \
+$ nix run --file . internal.pkgs.uv -- init --app --no-package --name workspace-root \
     --python 3.13 --no-workspace --vcs none workspace
 $ cd workspace
 $ rm main.py
-$ nix run --file . pkgs.uv -- init --lib --package --build-backend hatch \
+$ nix run --file . internal.pkgs.uv -- init --lib --package --build-backend hatch \
     --name ws-core --python 3.13 --vcs none packages/ws-core
-$ nix run --file . pkgs.uv -- init --lib --package --build-backend hatch \
+$ nix run --file . internal.pkgs.uv -- init --lib --package --build-backend hatch \
     --name ws-cli --python 3.13 --vcs none packages/ws-cli
-$ nix run --file . pkgs.uv -- add --no-sync --package ws-cli rich ws-core
-$ nix run --file . pkgs.uv -- add --no-sync --group build \
+$ nix run --file . internal.pkgs.uv -- add --no-sync --package ws-cli rich ws-core
+$ nix run --file . internal.pkgs.uv -- add --no-sync --group build \
     hatchling installer
 ```
 
@@ -318,12 +318,12 @@ The fourth project. `pyzmq` ships wheels that hold compiled code, and this is
 the only project here whose graph runs `auto-patchelf`.
 
 ```console
-$ nix run --file . pkgs.uv -- init --app --no-package --name binary-app \
+$ nix run --file . internal.pkgs.uv -- init --app --no-package --name binary-app \
     --python 3.13 --no-workspace --vcs none binary-app
 $ cd binary-app
 $ rm main.py
-$ nix run --file . pkgs.uv -- add --no-sync pyzmq
-$ nix run --file . pkgs.uv -- add --no-sync --group build installer
+$ nix run --file . internal.pkgs.uv -- add --no-sync pyzmq
+$ nix run --file . internal.pkgs.uv -- add --no-sync --group build installer
 ```
 
 `pyproject.nix` uses `pyzmq` for the same purpose, which is why this project
@@ -382,13 +382,13 @@ The fifth project. Its one dependency comes from a git repository, and from a
 subdirectory of that repository.
 
 ```console
-$ nix run --file . pkgs.uv -- init --app --no-package --name git-app \
+$ nix run --file . internal.pkgs.uv -- init --app --no-package --name git-app \
     --python 3.13 --no-workspace --vcs none git-app
 $ cd git-app
 $ rm main.py
-$ nix run --file . pkgs.uv -- add --no-sync \
+$ nix run --file . internal.pkgs.uv -- add --no-sync \
     "flit-core @ git+https://github.com/pypa/flit@3.12.0#subdirectory=flit_core"
-$ nix run --file . pkgs.uv -- add --no-sync --group build installer
+$ nix run --file . internal.pkgs.uv -- add --no-sync --group build installer
 ```
 
 `main.py` goes, for the reason that `binary-app` drops its own: this project
@@ -460,15 +460,15 @@ The sixth project. Both dependencies are files of `vendor/`, and no index
 serves either one.
 
 ```console
-$ nix run --file . pkgs.uv -- init --app --no-package --name vendored-app \
+$ nix run --file . internal.pkgs.uv -- init --app --no-package --name vendored-app \
     --python 3.13 --no-workspace --vcs none vendored-app
 $ cd vendored-app
 $ rm main.py
 $ mkdir vendor
 $ # write vendor/vendored-1.0.0-py3-none-any.whl and vendor/archived-1.0.0.tar.gz
-$ nix run --file . pkgs.uv -- add --no-sync \
+$ nix run --file . internal.pkgs.uv -- add --no-sync \
     vendor/vendored-1.0.0-py3-none-any.whl vendor/archived-1.0.0.tar.gz
-$ nix run --file . pkgs.uv -- add --no-sync --group build installer "flit-core>=3.11,<4"
+$ nix run --file . internal.pkgs.uv -- add --no-sync --group build installer "flit-core>=3.11,<4"
 ```
 
 `main.py` goes, for the reason that `git-app` drops its own. `flit-core` joins
@@ -522,15 +522,15 @@ The seventh project. Its registry is a directory of the project, and `uv`
 resolves both dependencies out of it.
 
 ```console
-$ nix run --file . pkgs.uv -- init --app --no-package --name local-index \
+$ nix run --file . internal.pkgs.uv -- init --app --no-package --name local-index \
     --python 3.13 --no-workspace --vcs none local-index
 $ cd local-index
 $ rm main.py
 $ mkdir index
 $ # write index/stocked-1.0.0-py3-none-any.whl and index/crated-1.0.0.tar.gz
 $ # add the two index tables below to pyproject.toml
-$ nix run --file . pkgs.uv -- add --no-sync stocked crated
-$ nix run --file . pkgs.uv -- add --no-sync --group build installer "flit-core>=3.11,<4"
+$ nix run --file . internal.pkgs.uv -- add --no-sync stocked crated
+$ nix run --file . internal.pkgs.uv -- add --no-sync --group build installer "flit-core>=3.11,<4"
 ```
 
 ```toml
@@ -588,12 +588,12 @@ The eighth project, and the one that needs a compiler. `psutil` and `cffi` both
 build from their source distribution, so a node of the graph runs `gcc`.
 
 ```console
-$ nix run --file . pkgs.uv -- init --app --no-package --name native-app \
+$ nix run --file . internal.pkgs.uv -- init --app --no-package --name native-app \
     --python 3.13 --no-workspace --vcs none native-app
 $ cd native-app
 $ rm main.py
-$ nix run --file . pkgs.uv -- add --no-sync psutil cffi
-$ nix run --file . pkgs.uv -- add --no-sync --group build installer setuptools
+$ nix run --file . internal.pkgs.uv -- add --no-sync psutil cffi
+$ nix run --file . internal.pkgs.uv -- add --no-sync --group build installer setuptools
 ```
 
 Then `tool.uv.no-binary-package` names both, so the planner takes the source

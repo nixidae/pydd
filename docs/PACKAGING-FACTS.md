@@ -2421,7 +2421,7 @@ that this lab does to the archive.
 executable for a generic Linux. Name an interpreter of nixpkgs instead:
 
 ```console
-$ py=$(nix build --file . pkgs.python313 --no-link --print-out-paths)
+$ py=$(nix build --file . internal.pkgs.python313 --no-link --print-out-paths)
 $ export UV_PYTHON_DOWNLOADS=never UV_PYTHON="$py/bin/python3.13"
 ```
 

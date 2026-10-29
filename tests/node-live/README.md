@@ -1,7 +1,7 @@
 # Live npm projects
 
 Real projects from GitHub, at the releases that nixpkgs builds:
-`nix run --file . test-node-live`. Each builds in `cli`, `huggorm` and
+`nix run --file . internal.test-node-live`. Each builds in `cli`, `huggorm` and
 `recursive`, and a project with npm's lock also in `out`. The modes must
 give one result.
 

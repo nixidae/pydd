@@ -138,7 +138,7 @@ each kind.
 ## Real projects
 
 `tests/rust-live` builds ripgrep, fd, hyperfine and bat from GitHub, as
-they are, in three modes: `nix run --file . test-rust-live`. Its README
+they are, in three modes: `nix run --file . internal.test-rust-live`. Its README
 lists what each one needed. Two changes came from them:
 
 - **LTO by the role of the unit.** The unit graph gives each unit the
@@ -214,7 +214,7 @@ tests under cross, a declared tool's platform, and other targets.
 ## The modes
 
 Each project of `tests/rust` gives one binary and one root in four modes:
-`nix run --file . test-rust`.
+`nix run --file . internal.test-rust`.
 
 | mode | Nix | writes through |
 | --- | --- | --- |

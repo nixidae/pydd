@@ -11,7 +11,7 @@ It also times `measure-floor`, a derivation that does nothing: every planner
 time holds that much.
 
 Writes docs/_generated/measurements.json and docs/_generated/measurements.md.
-Run it from the repository, after `nix run --file . test-projects`. Names
+Run it from the repository, after `nix run --file . internal.test-projects`. Names
 of projects measure only those, and keep the rest of the existing file.
 `--render` only writes the table again, from the JSON.
 """
@@ -111,7 +111,7 @@ def lines(paths: list[str]) -> int:
 
 
 def closure_bytes(mode: str) -> int:
-    path = nix("build", "--file", ".", f"projects.{mode}.pure-app.closure", "--no-link", "--print-out-paths")
+    path = nix("build", "--file", ".", f"internal.projects.{mode}.pure-app.closure", "--no-link", "--print-out-paths")
     info = json.loads(nix("path-info", "--json", "--closure-size", path))
     # A list before Nix 2.19, and an object keyed by path since.
     size: int = (info[0] if isinstance(info, list) else next(iter(info.values())))["closureSize"]
@@ -131,7 +131,7 @@ def floor_seconds(mode: str) -> float:
             "--raw",
             "--file",
             ".",
-            "measure-floor.drvPath",
+            "internal.measure-floor.drvPath",
             binary=os.environ[binary_var],
             env={"PYDD_MEASURE": uuid.uuid4().hex},
         )
@@ -157,7 +157,7 @@ def planner_seconds(mode: str, project: str) -> tuple[float, int | None]:
             "--raw",
             "--file",
             ".",
-            f"measure.{mode}.{project}.drvPath",
+            f"internal.measure.{mode}.{project}.drvPath",
             binary=os.environ[binary_var],
             env=env | {"PYDD_MEASURE": uuid.uuid4().hex},
         )
@@ -195,14 +195,18 @@ def main() -> int:
         measured: Measurements = json.loads((OUT / "measurements.json").read_text())
         (OUT / "measurements.md").write_text(render(measured))
         return 0
-    every = nix("eval", "--raw", "--file", ".", "projects.cli", "--apply", "p: toString (builtins.attrNames p)").split()
+    every = nix(
+        "eval", "--raw", "--file", ".", "internal.projects.cli", "--apply", "p: toString (builtins.attrNames p)"
+    ).split()
     projects = sys.argv[1:] or every
     previous = OUT / "measurements.json"
     kept: dict[str, dict[str, PlannerTime]] = (
         json.loads(previous.read_text())["planners"] if sys.argv[1:] and previous.exists() else {}
     )
     released = set(
-        nix("eval", "--raw", "--file", ".", "projects.out", "--apply", "p: toString (builtins.attrNames p)").split()
+        nix(
+            "eval", "--raw", "--file", ".", "internal.projects.out", "--apply", "p: toString (builtins.attrNames p)"
+        ).split()
     )
     data = Measurements(
         revision=nix("log", "-r", "@-", "--no-graph", "-T", "commit_id.short(8)", binary="jj"),

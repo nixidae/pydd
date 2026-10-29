@@ -1,5 +1,5 @@
 # The Pages workflow, as a value. `.github/workflows/pages.yml` is rendered
-# from this file: edit this one, then run `nix run --file . ci-workflow-update`.
+# from this file: edit this one, then run `nix run --file . internal.ci-workflow-update`.
 # `checks.ciWorkflow` fails when the two differ.
 #
 # It is the one workflow of pydd's own repository, which josh exports from
@@ -50,7 +50,7 @@ ghalib.evalWorkflow {
 
   jobs = {
     # Sphinx renders docs/, and docs/_generated holds the measurements that
-    # `nix run --file . measure-modes` wrote. A runner cannot run a
+    # `nix run --file . internal.measure-modes` wrote. A runner cannot run a
     # `builder-rpc-v0` planner in a private store, so the site never
     # measures.
     docs-build = {
@@ -61,7 +61,7 @@ ghalib.evalWorkflow {
       steps = [
         {
           name = "Build documentation";
-          run = "nix build --file . pydd-docs --out-link result --print-build-logs --print-out-paths";
+          run = "nix build --file . docs.default --out-link result --print-build-logs --print-out-paths";
         }
         {
           name = "Prepare Pages artifact";

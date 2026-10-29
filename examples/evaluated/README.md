@@ -11,7 +11,7 @@ Read `graph.nix`, then `default.nix`.
 
 From the top of the repository:
 
-    nix run --file . run -- examples.evaluated.huggorm
+    nix run --file . internal.run -- examples.evaluated.huggorm
 
 It prints:
 

@@ -9,8 +9,8 @@ the nodes leaves first, computes each placeholder, and submits the root.
 A path in `inputs` may be absolute, and a floating output needs no
 `$out` in `env`.
 
-    nix run --file . run -- examples.graph.drv
-    nix run --file . run-released -- examples.graph.released
+    nix run --file . internal.run -- examples.graph.drv
+    nix run --file . internal.run-released -- examples.graph.released
 
 The first prints `root read: hello from a node the planner wrote`. On
 released Nix a planner writes only its root, so the host makes the

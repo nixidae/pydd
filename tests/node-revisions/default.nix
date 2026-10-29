@@ -2,7 +2,7 @@
 # did not change must be the same derivation in both. Not in `checks`: it
 # fetches whole projects. Issue #894.
 #
-#     nix run --file . run -- node-revisions.t3code
+#     nix run --file . internal.run -- node-revisions.t3code
 { pkgs, pydd }:
 let
   github =

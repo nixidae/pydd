@@ -5,7 +5,7 @@ each mode. A mode decides what the planner may do, how the plan becomes
 derivations, and how a source distribution is built.
 
 **Modes that build a source node the same way give the same environment,
-and a test proves it.** `nix run --file . test-projects` builds each of the
+and a test proves it.** `nix run --file . internal.test-projects` builds each of the
 19 test projects in every mode, in two groups. It fails when two modes of a
 group give different store paths for one environment.
 

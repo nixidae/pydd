@@ -15,8 +15,8 @@ run build`, and then removes esbuild, a development dependency.
 Read `default.nix`, then `lib/node/default.nix` and `src/pydd/node`.
 From the top of the repository:
 
-    nix run --file . run -- examples.npm.cli
-    nix run --file . run -- examples.npm.cli check
+    nix run --file . internal.run -- examples.npm.cli
+    nix run --file . internal.run -- examples.npm.cli check
 
 `check` runs the program, and lists what the result holds:
 

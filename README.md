@@ -246,9 +246,9 @@ command to run and what it prints.
 
 An example is `examples.<name>.<writer>`:
 
-    nix run --file . run -- examples.hello.cli
-    nix run --file . run -- examples.venv.huggorm check
-    nix run --file . run -- examples.venv.cli check
+    nix run --file . internal.run -- examples.hello.cli
+    nix run --file . internal.run -- examples.venv.huggorm check
+    nix run --file . internal.run -- examples.venv.cli check
 
 Your daemon may be older than Nix master. `run` builds in a private store
 with a Nix from master, and copies the planner's closure in. `PYDD_STORE`
@@ -280,7 +280,7 @@ A planner's `PYTHONPATH` holds the core, its ecosystem and its one mode.
 ## Tests
 
     nix build --file . checks.tests
-    nix run --file . test-projects
+    nix run --file . internal.test-projects
 
 `test-projects` builds the uv projects of `tests/projects`, which cover
 workspaces, git, URL and path sources, a local registry, binary and native
@@ -295,16 +295,16 @@ paths for one environment, or for the root around it.
 evaluation and each build has a timeout (`--eval-timeout`, `--build-timeout`),
 so a stuck build fails the run instead of holding it.
 
-`nix run --file . test-live` builds real projects from GitHub, pinned and
+`nix run --file . internal.test-live` builds real projects from GitHub, pinned and
 unchanged, in four modes: fastapi-cli, typer, fastmcp, the MCP Python SDK
 and an example app of uv. `tests/live/README.md` lists what each one
 needed, and what each one changed in pydd.
 
-`nix run --file . test-rust` builds the Cargo projects of `tests/rust` in
+`nix run --file . internal.test-rust` builds the Cargo projects of `tests/rust` in
 four modes, and compares the binaries and the roots. `test-rust-live`
 builds ripgrep, fd, hyperfine and bat from GitHub, as they are, in three.
 
-`nix run --file . test-node` builds the npm projects of `tests/node` in
+`nix run --file . internal.test-node` builds the npm projects of `tests/node` in
 five modes. `test-node-live` builds http-server, nodemon,
 npm-check-updates and json-server, at the releases that nixpkgs builds,
 in four.

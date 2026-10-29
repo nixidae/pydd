@@ -1,7 +1,7 @@
 # Live Cargo projects
 
 Real projects from GitHub, pinned to a release and built as they are:
-`nix run --file . test-rust-live`. Each builds in three modes (`cli`,
+`nix run --file . internal.test-rust-live`. Each builds in three modes (`cli`,
 `huggorm`, `recursive`), and the modes must give one binary.
 
 | project | what it covers | needed | changed in pydd |

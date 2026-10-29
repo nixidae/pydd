@@ -2,7 +2,7 @@
 # for what an npm project in the wild needs. Each entry says what, if
 # anything, it needs beyond the project itself.
 #
-#     nix run --file . run -- node-live.cli.nodemon
+#     nix run --file . internal.run -- node-live.cli.nodemon
 { pkgs, pydd }:
 let
   github =

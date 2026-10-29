@@ -11,8 +11,8 @@ path that the nodes may use.
 
 From the top of the repository:
 
-    nix run --file . run -- examples.hello.cli
-    nix run --file . run -- examples.hello.huggorm
+    nix run --file . internal.run -- examples.hello.cli
+    nix run --file . internal.run -- examples.hello.huggorm
 
 Both print:
 

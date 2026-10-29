@@ -1,6 +1,6 @@
 # Cargo projects, each with a check that runs what it built.
 #
-#     nix run --file . run -- rust.cli.serde-app
+#     nix run --file . internal.run -- rust.cli.serde-app
 { pkgs, pydd }:
 let
   projects = {

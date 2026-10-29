@@ -4,8 +4,8 @@ Real uv projects from GitHub, pinned, built as they are. Each one builds
 in four modes, one for each level of restriction. The environments must
 be one store path, and the roots around them another:
 
-    nix run --file . test-live
-    nix run --file . run -- live.cli.fastmcp
+    nix run --file . internal.test-live
+    nix run --file . internal.run -- live.cli.fastmcp
 
 | project | what it is | it needs |
 | --- | --- | --- |

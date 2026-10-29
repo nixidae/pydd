@@ -1,5 +1,5 @@
 # GENERATED FILE -- do not edit by hand.
-# Edit ci/workflows/pages.nix, then run: nix run --file . ci-workflow-update
+# Edit ci/workflows/pages.nix, then run: nix run --file . internal.ci-workflow-update
 jobs:
   docs-build:
     if: github.ref == 'refs/heads/main'
@@ -23,7 +23,7 @@ jobs:
           trusted-users = root runner
         install_url: https://releases.nixos.org/nix/nix-2.34.8/install
     - name: Build documentation
-      run: nix build --file . pydd-docs --out-link result --print-build-logs --print-out-paths
+      run: nix build --file . docs.default --out-link result --print-build-logs --print-out-paths
     - name: Prepare Pages artifact
       run: |
         mkdir -p public

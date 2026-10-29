@@ -2,7 +2,7 @@
 # what a Cargo project in the wild needs. Each entry says what, if anything, it
 # needs beyond the project itself.
 #
-#     nix run --file . run -- rust-live.cli.ripgrep
+#     nix run --file . internal.run -- rust-live.cli.ripgrep
 { pkgs, pydd }:
 let
   github =

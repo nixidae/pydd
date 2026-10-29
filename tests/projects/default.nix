@@ -2,8 +2,8 @@
 # `out` is the check, `environment` is the environment it checks, `root` is
 # the derivation around it, and `closure` is what the planners run on.
 #
-#     nix run --file . run -- projects.cli.pure-app
-#     nix run --file . test-projects
+#     nix run --file . internal.run -- projects.cli.pure-app
+#     nix run --file . internal.test-projects
 #
 # The variants are the ones the ddrn lab's `test_projects.py` ran: one lock
 # file, and the selections and forms that it does not record.

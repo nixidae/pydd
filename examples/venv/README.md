@@ -21,8 +21,8 @@ puts `flit_core` and the installer in the lock, and neither is installed.
 Read `default.nix`, then `lib/python/uv.nix` and `lib/python/graph.nix`.
 From the top of the repository:
 
-    nix run --file . run -- examples.venv.huggorm
-    nix run --file . run -- examples.venv.huggorm check
+    nix run --file . internal.run -- examples.venv.huggorm
+    nix run --file . internal.run -- examples.venv.huggorm check
 
 `examples.venv.cli` builds the same environment with no huggorm.
 `pydd.modes.render` writes the derivations that `graph.nix` makes, so

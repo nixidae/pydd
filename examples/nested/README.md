@@ -14,7 +14,7 @@ as `pydd.candidate`, the `.drv` is an input of the outer planner.
 
 From the top of the repository:
 
-    nix run --file . run -- examples.nested.huggorm
+    nix run --file . internal.run -- examples.nested.huggorm
 
 It prints:
 

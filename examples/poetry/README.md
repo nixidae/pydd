@@ -20,8 +20,8 @@ Poetry locks no build backend either. The `build` group of
 Read `default.nix`, then `lib/python/poetry.nix` and
 `src/pydd/python/_poetrylock.py`. From the top of the repository:
 
-    nix run --file . run -- examples.poetry.huggorm check
-    nix run --file . run -- examples.poetry.cli check
+    nix run --file . internal.run -- examples.poetry.huggorm check
+    nix run --file . internal.run -- examples.poetry.cli check
 
 The build log shows the same plan as `venv`:
 

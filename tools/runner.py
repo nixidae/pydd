@@ -30,9 +30,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import PIPE, CalledProcessError
-from typing import IO, Any
+from typing import IO, Any, Final
 
 import anyio
+
+# Every attribute a caller names is relative to this set of default.nix.
+ROOT: Final = "internal"
 
 
 @dataclass(frozen=True)
@@ -62,6 +65,7 @@ class Lane:
         stderr: IO[Any] | None = None,
     ) -> list[str]:
         """Build each target of `attribute`, from one evaluation, and give the paths in order."""
+        attribute = f"{ROOT}.{attribute}"
         # What the planner runs on may be built only on the host, such as a
         # huggorm lane, so copy it in rather than build it again. **The host's
         # daemon is the slow path** (nixidae/nixidae#419: 9 s against 2 s for
@@ -216,7 +220,7 @@ class TestSet:
 async def attribute_names(attribute: str) -> list[str]:
     with anyio.fail_after(300):
         result = await anyio.run_process(
-            ["nix", "eval", "--json", "--file", ".", attribute, "--apply", "builtins.attrNames"]
+            ["nix", "eval", "--json", "--file", ".", f"{ROOT}.{attribute}", "--apply", "builtins.attrNames"]
         )
     names: list[str] = json.loads(result.stdout)
     return names

@@ -16,8 +16,8 @@ platform, offline over a vendor directory that nixpkgs makes from
 Read `default.nix`, then `lib/rust/default.nix` and `src/pydd/rust`.
 From the top of the repository:
 
-    nix run --file . run -- examples.cargo.cli
-    nix run --file . run -- examples.cargo.cli check
+    nix run --file . internal.run -- examples.cargo.cli
+    nix run --file . internal.run -- examples.cargo.cli check
 
 The first lists the binary. `check` runs it, and builds `tests`: the
 library's unit test, the doctest and the binary's test harness, each a
@@ -32,4 +32,4 @@ node of its own:
 `root.shell` is a development shell with cargo, rustc, clippy, rustfmt and
 the tools of every -sys crate:
 
-    nix develop --file . examples.cargo.cli.shell
+    nix develop --file . internal.examples.cargo.cli.shell
