@@ -803,7 +803,7 @@ let
           # the row below was part of this document, and the lock file of the
           # benchmark then paid 27.9 MB of JSON for each level.
           # `docs/PACKAGING-FACTS.md` holds both measurements.
-          PYDD_INPUTS = builtins.elemAt levelJson (depth - 1);
+          PYDD_INPUTSPath = builtins.elemAt levelFile (depth - 1);
 
           # **A URL source names where its project lives inside the archive.**
           # `uv.nix` puts `subdirectory` on the artefact, and the planner of this
@@ -837,6 +837,17 @@ let
   # A `builtins.toJSON` inside `sdistPlanner` would run one time for each
   # planner instead, over a document of a quarter of a megabyte.
   levelJson = map builtins.toJSON levels;
+
+  # **Each level's menu is one store file, and a planner names only that
+  # file** (nixidae/nixidae#1135). Every `.drv` of the menu is a reference of
+  # whatever carries the text. In the planner's own environment, each planner
+  # of the level held the whole menu as references: 500 to 542 each, for 109
+  # planners of `zmq-sdist`. The file holds them once, and the sandbox gets the
+  # same closure through it.
+  #
+  # `PYDD_INPUTSPath` is the name that `passAsFile` would set, so
+  # `pydd.python._env.env` reads it as it reads a passed file.
+  levelFile = map (pkgs.writeText "pydd-menu.json") levelJson;
 
   # The inputs, with a planner for each source distribution, to `depth`
   # levels. This maps over the lock file and not over `baseInputs.artifacts`,
@@ -907,7 +918,7 @@ let
         // roleEnv
         // {
           PYDD_ROLE = role;
-          PYDD_INPUTS = builtins.elemAt levelJson sdistPlannerDepth;
+          PYDD_INPUTSPath = builtins.elemAt levelFile sdistPlannerDepth;
           PYDD_PLANNED = builtins.toJSON planned;
           PYDD_VENV_NAME = venvName;
           PYDD_ONLY = "${project}:${form}";
