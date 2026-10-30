@@ -494,6 +494,25 @@ closure of that one file carries the whole menu into the sandbox. The full
 
 Evaluating that whole set costs 17.7 s with a cold evaluation cache.
 
+### A menu in a planner's environment is a reference of each planner
+
+A `.drv` in `PYDD_INPUTS` is an input source of the planner, so the store
+records one reference for it. Every sdist planner of a level reads the same
+menu, so the count multiplies by the planner count (nixidae/nixidae#1135).
+With the menu in one `writeText` file per level, the file holds the
+references once and each planner holds the file.
+
+`projects.cli.zmq-sdist`, x86_64-linux, 2026-10-30, counted with
+`nix derivation show` over every planner and menu file reachable from the
+root:
+
+| menu | planners | references per planner | references in all |
+| --- | --- | --- | --- |
+| in each planner's environment | 109 | 500 to 542 | 57176 |
+| one file per level (3 files, 497 to 533 each) | 109 | 8 | 3011 |
+
+The root planner keeps its menu in its environment: 533 references, once.
+
 ### The return path, proved
 
 A second probe closed the loop. A `builder-rpc-v0` planner took `hello` as a
