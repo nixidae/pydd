@@ -21,7 +21,7 @@ jobs:
           substituters = https://cache.nixos.org?priority=1 https://lillecarl.cachix.org?priority=2
           trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= lillecarl.cachix.org-1:NN/LLMg7mbyvZCu32Qlo8LpSHqNw7Rr3VBCEYQvRpT0=
           trusted-users = root runner
-        install_url: https://releases.nixos.org/nix/nix-2.34.8/install
+        install_url: https://releases.nixos.org/nix/nix-2.35.2/install
     - name: Build documentation
       run: nix build --file . docs.default --out-link result --print-build-logs --print-out-paths
     - name: Prepare Pages artifact

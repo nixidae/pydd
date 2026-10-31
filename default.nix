@@ -26,8 +26,8 @@ let
 
   # The newest release, for planners that write `$out`. Its huggorm lane
   # renders the ATerm that this Nix parses.
-  nixReleased = pkgs.nixVersions.nix_2_35;
-  huggormReleased = huggormSet.lanes.nix_2_35.huggorm;
+  nixReleased = pkgs.nixVersions.latest;
+  huggormReleased = huggormSet.lanes.${huggormSet.lib.defaultLane}.huggorm;
 
   # Writes derivations from a build, as JSON, for a planner in any language
   # (nixidae/nixidae#782). One per Nix: only master has `builder-rpc-v0`.
@@ -174,7 +174,7 @@ let
     ghalib = (import sources.ghanix { inherit lib; }).lib;
     ciWorkflow = import ./ci/workflows/pages.nix {
       inherit lib ghalib;
-      nixVersion = pkgs.nix.version;
+      nixVersion = pkgs.nixVersions.latest.version;
     };
     ciWorkflowFile =
       pkgs.runCommand "pages.yml"
