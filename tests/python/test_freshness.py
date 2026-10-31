@@ -114,6 +114,47 @@ class TestAStaleLock:
             check_freshness(lock, write(tmp_path, "trivial", text))
 
 
+#: What `kitchen-sink.lock`'s member `a` resolved from, with a specifier on
+#: every dependency that `tool.uv.sources` sends elsewhere. uv keeps a specifier
+#: only for an index source (`RequirementSource::Registry`), so the lock file
+#: records `{ name = "pip", git = "..." }` for `pip>=20`.
+KITCHEN_SINK = """
+[project]
+name = "a"
+version = "0.1.0"
+dependencies = [
+    "arpeggio>=2",
+    "attrs>=23",
+    "b>=0.1",
+    "blinker>=1.6",
+    "c-editable>=0.1",
+    "pip>=20",
+    "requests>=2.32.3",
+    "urllib3>=2",
+]
+"""
+
+
+class TestASourceOtherThanAnIndex:
+    """`tool.uv.sources` moves a dependency to git, a path or a URL."""
+
+    def test_its_specifier_raises_no_alarm(self, tmp_path: Path) -> None:
+        lock = Lock.read(str(LOCKS / "kitchen-sink.lock"))
+        check_freshness(lock, write(tmp_path, "a", KITCHEN_SINK))
+
+    def test_an_index_dependency_beside_it_is_still_compared(self, tmp_path: Path) -> None:
+        text = KITCHEN_SINK.replace("requests>=2.32.3", "requests>=3")
+        lock = Lock.read(str(LOCKS / "kitchen-sink.lock"))
+        with pytest.raises(LockError, match=re.escape("adds ['requests>=3']")):
+            check_freshness(lock, write(tmp_path, "a", text))
+
+    def test_a_removed_dependency_is_still_stale(self, tmp_path: Path) -> None:
+        text = KITCHEN_SINK.replace('    "pip>=20",\n', "")
+        lock = Lock.read(str(LOCKS / "kitchen-sink.lock"))
+        with pytest.raises(LockError, match=re.escape("uv.lock is stale")):
+            check_freshness(lock, write(tmp_path, "a", text))
+
+
 class TestAnExtra:
     """**An extra is a row of `requires-dist`, and not a table of its own.**
 

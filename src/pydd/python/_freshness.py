@@ -34,6 +34,10 @@ module compares those three. It ignores:
 - **the source**, because a `tool.uv.sources` entry moves the location out of
   the requirement and into another table. The two sides then spell one
   dependency two ways, and neither spelling is wrong.
+- **the specifier of a dependency that a source sends to git, a path or a
+  URL.** uv's `RequirementSource` holds a specifier only in its `Registry`
+  variant, so lowering drops it: `b>=1.0` is locked as `{ name = "b",
+  directory = "../b" }`. `UNVERSIONED_SOURCES` names the row keys.
 - **a dynamic `dependencies` table**, because the file does not hold it. uv
   builds the package to learn such a list, and `_tables` gives the reason.
 
@@ -124,12 +128,30 @@ def from_metadata(entry: Mapping[str, Any]) -> Pin:
     )
 
 
+#: The keys of a `[package.metadata]` row that name a source other than an
+#: index. uv's `RequirementSource` carries a specifier only in its `Registry`
+#: variant, so a declaration that `tool.uv.sources` sends to git or a path
+#: loses its specifier in the lock: `b>=1.0` is stored as
+#: `{ name = "b", directory = "../b" }`.
+UNVERSIONED_SOURCES = frozenset({"git", "path", "directory", "editable", "virtual", "url"})
+
+
 def pins(entries: Iterable[Mapping[str, Any]]) -> set[Pin]:
     return {from_metadata(entry) for entry in entries}
 
 
-def declared(entries: Iterable[str]) -> set[Pin]:
-    return {from_declaration(text) for text in entries}
+def unversioned(entries: Iterable[Mapping[str, Any]]) -> set[str]:
+    """The names whose locked row names a source that keeps no specifier."""
+    return {canonicalize_name(entry["name"]) for entry in entries if UNVERSIONED_SOURCES & entry.keys()}
+
+
+def declared(entries: Iterable[str], unversioned_names: set[str] | None = None) -> set[Pin]:
+    stated = {from_declaration(text) for text in entries}
+    if not unversioned_names:
+        return stated
+    return {
+        Pin(name=pin.name, extras=pin.extras, specifier="") if pin.name in unversioned_names else pin for pin in stated
+    }
 
 
 def _difference(locked: set[Pin], stated: set[Pin]) -> str:
@@ -258,7 +280,8 @@ def _tables(document: Mapping[str, Any], metadata: Mapping[str, Any]) -> list[tu
         stated = list(project.get("dependencies", []))
         for extra in sorted(optional):
             stated.extend(optional[extra])
-        pairs.append(("dependencies", pins(metadata.get("requires-dist", [])), declared(stated)))
+        requires_dist: Sequence[Mapping[str, Any]] = metadata.get("requires-dist", [])
+        pairs.append(("dependencies", pins(requires_dist), declared(stated, unversioned(requires_dist))))
 
     groups = groups_of(document)
     raw_locked: Mapping[str, Sequence[Mapping[str, Any]]] = metadata.get("requires-dev", {})
@@ -269,7 +292,7 @@ def _tables(document: Mapping[str, Any], metadata: Mapping[str, Any]) -> list[tu
         (
             f"dependency-groups.{group}",
             pins(locked_groups.get(group, [])),
-            declared(groups.get(group, [])),
+            declared(groups.get(group, []), unversioned(locked_groups.get(group, []))),
         )
         for group in sorted(set(groups) | set(locked_groups))
     )
