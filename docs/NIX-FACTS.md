@@ -711,9 +711,9 @@ store path, and `path-info` records the path in its own `references`. A
 floating content-addressed output takes this in its stride, because Nix
 computes the hash modulo the self-reference.
 
-**Unresolved, and it belongs to the harness and not to the graph.**
+**It belongs to Nix 2.34, and not to the graph.**
 `nix copy --from <chroot store>` of such a path into the daemon of this
-machine, which runs Nix 2.34, fails:
+machine, which then ran Nix 2.34, fails:
 
 ```text
 error: ca hash mismatch importing path '/nix/store/2h0bgg8v…-certifi-2024.8.30';
@@ -722,9 +722,17 @@ error: ca hash mismatch importing path '/nix/store/2h0bgg8v…-certifi-2024.8.30
 ```
 
 The path has a self-reference, so the two sides have to agree on the hash
-modulo that reference. **This is not root-caused.** The graph itself is not
-affected: `ddrn/examples/venv-graph/check.nix` runs the environment inside the
-store that holds it, and it passes.
+modulo that reference, and **Nix 2.34 computes it wrong.** `HashModuloSink`
+zeroes the self-references and then hashes `|<offset>` for each one. In 2.34,
+`RewritingSink` calls `rewriteStrings(s, rewrites)` without `&matches`
+(`src/libstore/references.cc`), so it zeroes them and records no offset; 2.35
+passes `&matches, pos`. A path that 2.35 built therefore fails a 2.34 import,
+and stock 2.35 imports it. Measured on 2026-10-31 with
+`python-dateutil-2.9.0.post0` from a pydd environment: 2.34.9's "got" is the
+SHA-256 of the zeroed NAR with no offsets, and the recorded hash is the zeroed
+NAR plus the 36 offsets. The graph itself is not affected:
+`ddrn/examples/venv-graph/check.nix` runs the environment inside the store
+that holds it, and it passes.
 
 **A check of a store output runs as a derivation.** Every symlink that
 `make-venv.py` writes is absolute, as every store path is, and a chroot store
