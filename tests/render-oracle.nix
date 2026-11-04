@@ -142,6 +142,20 @@ let
       artifact = fetch "psutil-7.0.0-cp36-abi3-manylinux_2_17_x86_64.whl";
     }
     {
+      # A wheel node takes `patches` and `postInstall`, and drops the rest
+      # (nixidae/nixidae#1174).
+      name = "weasyprint";
+      kind = "wheel";
+      platform = false;
+      artifact = fetch "weasyprint-70.0-py3-none-any.whl";
+      overrides = {
+        env.IGNORED = "1";
+        preBuild = "ignored";
+        patches = [ (built (package "library-paths-patch")) ];
+        postInstall = "rm -r weasyprint/tests";
+      };
+    }
+    {
       name = "flit-sdist";
       kind = "sdist";
       platform = false;

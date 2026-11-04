@@ -117,6 +117,7 @@ let
     vendored-app = check ./check-vendored.nix { };
     local-index = check ./check-index.nix { };
     wheel-features = check ./check-wheel-features.nix { };
+    wheel-override = check ./check-wheel-override.nix { };
     abi-gil = check ./check-probe.nix {
       project = ./abi-probe;
       probe = "abiprobe.ABI";

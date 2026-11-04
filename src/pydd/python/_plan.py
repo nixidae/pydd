@@ -99,6 +99,10 @@ OVERRIDE_KEYS = {
     "fixup": bool,
 }
 
+#: The keys that reach a wheel node (nixidae/nixidae#1174). `graph.nix` gives
+#: the reason at `wheelOverridesOf`.
+WHEEL_OVERRIDE_KEYS = ("patches", "postInstall")
+
 
 def overrides_from(inputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """The node override of each package, by PEP 503 name, ready for a node.
@@ -202,6 +206,12 @@ class Plan:
         override = self.overrides.get(name)
         return ({"buildTools": roots} if roots else {}) | ({"overrides": override} if override else {})
 
+    def wheel_override_for(self, package: str) -> dict[str, Any]:
+        """The `overrides` key of the node that installs a wheel of `package`."""
+        override = self.overrides.get(canonicalize_name(package), {})
+        kept = {key: value for key, value in override.items() if key in WHEEL_OVERRIDE_KEYS}
+        return {"overrides": kept} if kept else {}
+
     def add(self, entry: dict[str, Any]) -> str:
         """Add one node, and return its name.
 
@@ -289,6 +299,8 @@ class Plan:
             # already built, so the node that installs one needs no compiler
             # and takes no dependency on one.
             entry |= self.tools_for(artifact.package)
+        elif kind == "wheel":
+            entry |= self.wheel_override_for(artifact.package)
         return self.add(entry)
 
     def editable_node(self, node: LocalNode, *, root: str) -> str:

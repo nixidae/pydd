@@ -20,6 +20,8 @@
   application,
   plannerRow,
   localPlanned,
+  # The `overrides` argument of `../python/planner.nix`, by package name.
+  overrides,
 }:
 let
   # The form that `built` of `../python/planner.nix` gives a tool, with its
@@ -62,12 +64,36 @@ let
     }
     // (if entry ? path then { inherit (entry) path; } else { out = "${entry.drv}"; });
 
-  wheelNode = entry: {
-    name = "${entry.package}-${entry.version}";
-    kind = "wheel";
-    platform = isPlatformWheel entry.filename;
-    artifact = hostArtifact entry;
-  };
+  # `Plan.wheel_override_for`: the keys of `WHEEL_OVERRIDE_KEYS`, a patch as a
+  # tool travels.
+  wheelOverrides = pkgs.lib.mapAttrs' (
+    name: override:
+    let
+      kept = builtins.intersectAttrs {
+        patches = null;
+        postInstall = null;
+      } override;
+    in
+    pkgs.lib.nameValuePair (normalise name) (
+      kept
+      // pkgs.lib.optionalAttrs (kept ? patches) {
+        patches = map (patch: { out = "${patch}"; }) kept.patches;
+      }
+    )
+  ) overrides;
+
+  wheelNode =
+    entry:
+    let
+      override = wheelOverrides.${normalise entry.package} or { };
+    in
+    {
+      name = "${entry.package}-${entry.version}";
+      kind = "wheel";
+      platform = isPlatformWheel entry.filename;
+      artifact = hostArtifact entry;
+    }
+    // pkgs.lib.optionalAttrs (override != { }) { overrides = override; };
 
   wheels = builtins.filter (entry: entry.kind == "wheel") entries;
 

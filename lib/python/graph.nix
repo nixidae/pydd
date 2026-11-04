@@ -213,6 +213,20 @@ let
     )
     // override.env or { };
 
+  # **A wheel node takes `patches` and `postInstall`, and no other key**
+  # (nixidae/nixidae#1174). The rest act on a build, and a wheel is built
+  # already. A node with neither gets no attribute. `install-wheel.sh` runs
+  # both in `site-packages`.
+  wheelOverridesOf =
+    node:
+    let
+      override = builtins.intersectAttrs {
+        patches = null;
+        postInstall = null;
+      } (node.overrides or { });
+    in
+    if override == { } then { } else { inherit site; } // overridesOf { overrides = override; };
+
   # **A source build, with `stdenv` when the planner has nixpkgs.** Only the
   # `recursive-nixpkgs` mode passes `pkgs`: its planner imports nixpkgs from
   # an input store path, which recursive-nix allows. stdenv's hooks then do
@@ -300,6 +314,7 @@ let
         # whose platform tag is not `any` carries a binary that was linked
         # against another Linux.
         // (if node.platform then patchelfInputs else { })
+        // wheelOverridesOf node
       )
     else if node.kind == "editable" then
       mkSource node {

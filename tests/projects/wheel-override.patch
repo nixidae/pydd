@@ -1,0 +1,4 @@
+--- /dev/null
++++ b/mdurl/_pydd_patched.py
+@@ -0,0 +1 @@
++PATCHED = True

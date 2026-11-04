@@ -186,7 +186,9 @@ package.
 
 **A node override is data.** The planner writes it into the node that
 builds the package from source, so it works in every mode. A wheel node
-takes none.
+takes `patches` and `post-install` only, and runs them in its
+`site-packages` (#1174). That is how a wheel that `dlopen`s a library by
+name gets the store path written into its code.
 
     [tool.pydd.overrides.numpy]
     config-settings = { setup-args = ["-Dblas=blas", "-Dlapack=lapack"] }

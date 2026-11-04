@@ -23,6 +23,9 @@
 #   runInstaller   `run-installer.py`, which runs `installer` in that venv
 #   out            the output path
 #
+# A wheel with a node override also gives `site`, and `patches` and `patch`,
+# `postInstall`, or both.
+#
 # A wheel that carries a binary also gives:
 #   autoPatchelf   the `auto-patchelf` of nixpkgs
 #   patchelfLibs   the directories to search for a shared library
@@ -45,6 +48,22 @@ cp "$wheel" "./$wheelName"
 # script find the packages beside it.
 "$python" "$makeVenv" "$TMPDIR/installer" "$installerPath"
 "$TMPDIR/installer/bin/python" "$runInstaller" "$python" --prefix "$out" "./$wheelName"
+
+# **A node override reaches the installed tree, not the wheel**
+# (nixidae/nixidae#1174). A wheel that `dlopen`s a library by name needs the
+# store path written into its code, and nixpkgs patches the same file. A patch
+# takes `-p1` against `site-packages`, so `a/<package>/x.py` names the file.
+# The patched file no longer matches its hash in `RECORD`.
+if [ -n "${patches:-}${postInstall:-}" ]; then
+  (
+    cd "$out/$site"
+    read -ra patchFiles <<<"${patches:-}"
+    for patchFile in "${patchFiles[@]}"; do
+      "$patch" -p1 -i "$patchFile"
+    done
+    eval "${postInstall:-}"
+  )
+fi
 
 # **A wheel that carries a binary is built for a different Linux.** A manylinux
 # wheel names `/lib64/ld-linux-x86-64.so.2` as its ELF interpreter and gives no

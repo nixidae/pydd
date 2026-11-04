@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from ...core._derivation import Derivation, Floating
 from ...core._hash import downstream_placeholder, dynamic_placeholder
-from ...python._plan import BUILT_PAIRS, output_name
+from ...python._plan import BUILT_PAIRS, WHEEL_OVERRIDE_KEYS, output_name
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -208,6 +208,12 @@ class Graph:
         env: dict[str, Text] = override.get("env", {})
         return attrs | env
 
+    def wheel_overrides_of(self, node: dict[str, Any]) -> dict[str, Text]:
+        override = {key: value for key, value in node.get("overrides", {}).items() if key in WHEEL_OVERRIDE_KEYS}
+        if not override:
+            return {}
+        return {"site": Text(self.site)} | self.overrides_of({"overrides": override})
+
     def local(self, node: dict[str, Any], mode: str) -> dict[str, Any]:
         return {
             "name": node["name"],
@@ -238,6 +244,7 @@ class Graph:
                         "installerPath": self.installer_path(),
                     }
                     | (self.patchelf_inputs() if node["platform"] else {})
+                    | self.wheel_overrides_of(node)
                 )
             case "editable":
                 return self.source(

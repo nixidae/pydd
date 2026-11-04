@@ -34,6 +34,24 @@ def test_only_the_named_package_gets_the_override() -> None:
     assert "overrides" not in plan.nodes[1]
 
 
+def wheel(package: str) -> Artifact:
+    filename = f"{package.replace('-', '_')}-1.0-py3-none-any.whl"
+    return Artifact(package=package, version="1.0", filename=filename, kind="wheel")
+
+
+def test_a_wheel_node_takes_patches_and_post_install_only() -> None:
+    given = {"Weasy_Print": {"patches": [{"out": "/p"}], "postInstall": "true", "env": {"A": "1"}, "fixup": False}}
+    plan = Plan(overrides=overrides_from({"overrides": given}))
+    plan.artifact_node(wheel("weasy-print"), "wheel")
+    assert plan.nodes[0]["overrides"] == {"patches": [{"out": "/p"}], "postInstall": "true"}
+
+
+def test_a_wheel_node_with_no_wheel_key_gets_no_override() -> None:
+    plan = Plan(overrides=overrides_from({"overrides": {"rich": {"env": {"A": "1"}}}}))
+    plan.artifact_node(wheel("rich"), "wheel")
+    assert "overrides" not in plan.nodes[0]
+
+
 def test_a_tree_with_a_vcs_version_plugin_gets_the_locked_version() -> None:
     plan = Plan(overrides=overrides_from({"overrides": {"kept": {"env": {"UV_DYNAMIC_VERSIONING_BYPASS": "9"}}}}))
     plan.pretend_version("demo", "1.2.3", [Requirement("hatchling"), Requirement("uv-dynamic-versioning>=0.7")])
