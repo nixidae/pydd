@@ -296,6 +296,15 @@ paths for one environment, or for the root around it.
 (half the cores by default), and the modes of one project in order. Each
 evaluation and each build has a timeout (`--eval-timeout`, `--build-timeout`),
 so a stuck build fails the run instead of holding it.
+`--modes` runs only the modes it names.
+
+`--pynixd` puts a pynixd in front of each private store, and the store gets
+a name of its own (`store-pynixd`). pynixd builds there in its own sandbox
+and writes the store itself, so the run tests pynixd as the daemon:
+
+    nix run --file . internal.test-projects -- --pynixd --modes recursive recursive-eval recursive-nixpkgs
+
+Each pynixd's configuration and log go beside the project logs.
 
 `nix run --file . internal.test-live` builds real projects from GitHub, pinned and
 unchanged, in four modes: fastapi-cli, typer, fastmcp, the MCP Python SDK

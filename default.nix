@@ -27,6 +27,9 @@ let
   # The newest release, for planners that write `$out`. Its huggorm lane
   # renders the ATerm that this Nix parses.
   nixReleased = pkgs.nixVersions.latest;
+
+  # `runner --pynixd` serves each store through it.
+  inherit ((import sources.pynixd { inherit pkgs sources; }).packages) pynixd;
   huggormReleased = huggormSet.lanes.${huggormSet.lib.defaultLane}.huggorm;
 
   # Writes derivations from a build, as JSON, for a planner in any language
@@ -137,6 +140,8 @@ let
           export PYDD_NIX_MASTER=${lib.getExe nix}
           export PYDD_NIX_RELEASED=${lib.getExe nixReleased}
           export PYDD_NIX_RELEASED_VERSION=${nixReleased.version}
+          export PYDD_PYNIXD=${lib.getExe' pynixd "pynixd"}
+          export PYDD_SYSTEM=${pkgs.stdenv.hostPlatform.system}
           exec ${
             nixvenv {
               python = pkgs.python3;
