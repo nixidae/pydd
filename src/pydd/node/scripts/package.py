@@ -163,6 +163,13 @@ def script_env(top: Path, where: Path, tree: Path, nodejs: str, name: str, versi
         "npm_config_offline": "true",
         "npm_config_update_notifier": "false",
         "npm_config_cache": str(top / "npm-cache"),
+    } | {
+        # A package's own `overrides.<name>.env` wins over the defaults above:
+        # sharp reads build_from_source as "compile libvips", and needs it off
+        # to take the prebuilt binary its lock already holds.
+        key: value
+        for key, value in os.environ.items()
+        if key.startswith("npm_config_")
     }
 
 
