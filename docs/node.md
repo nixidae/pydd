@@ -6,7 +6,9 @@ lane, it uses only `pydd.core` and the root wrapper `lib/core/root.nix`.
     root = pydd.node.npm { project = ./.; };
 
 The result is an ordinary derivation. It holds the project in
-`lib/node_modules/<name>` and its programs in `bin`. It takes `override`
+`lib/node_modules/<package name>`, the `name` of its `package.json` as
+`npm install -g` places it, and its programs in `bin`. The `name`
+argument names only the store path. It takes `override`
 over the arguments, `overrideAttrs` and the install hooks.
 
 ## The lock is the plan

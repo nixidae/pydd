@@ -267,7 +267,8 @@ in
 
     Takes `project`, the directory that holds `package.json` and
     `package-lock.json`. Returns an ordinary derivation that holds the
-    project in `lib/node_modules/<name>` and its programs in `bin`, with
+    project in `lib/node_modules/<the name in package.json>` (not the
+    `name` argument, which names the store path) and its programs in `bin`, with
     `override` over these arguments. Its `passthru` holds `planner`,
     `dynamic` (the output that the planner submits), `shell` and `closure`.
   */
