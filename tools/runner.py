@@ -161,11 +161,13 @@ PYNIXD_ROUTES: Final = dict.fromkeys(
 )
 
 
-def pynixd_config(lanes: Iterable[Lane], socket: Path) -> dict[str, Any]:
+def pynixd_config(lanes: Iterable[Lane], socket: Path, *, daemon: bool = True) -> dict[str, Any]:
     """A pynixd that serves one store on `socket`, with the union of the lanes' features.
 
     **pynixd writes this store itself** (`pynixd_writes`). A deployment keeps
     writes on the daemon; this store is the run's own and goes at the next run.
+    Without `daemon`, no Nix daemon runs under pynixd: it answers every operation
+    itself, and one it cannot answer fails (nixidae/nixidae#1155).
     """
     lanes = list(lanes)
     nix = {lane.nix for lane in lanes}
@@ -191,6 +193,7 @@ def pynixd_config(lanes: Iterable[Lane], socket: Path) -> dict[str, Any]:
                 "gc_enabled": False,
                 "pynixd_writes": True,
                 "op_routes": PYNIXD_ROUTES,
+                "daemon": daemon,
                 # The managed daemon and pynixd's builder both read the store's settings from this.
                 "extra_env": {"NIX_CONFIG": nix_config()},
             }
@@ -199,7 +202,7 @@ def pynixd_config(lanes: Iterable[Lane], socket: Path) -> dict[str, Any]:
 
 
 @asynccontextmanager
-async def served(lanes: dict[str, Lane], log: Path) -> AsyncIterator[dict[str, Lane]]:
+async def served(lanes: dict[str, Lane], log: Path, *, daemon: bool = True) -> AsyncIterator[dict[str, Lane]]:
     """Run one pynixd for each store of `lanes`, and give the lanes with the URL of each."""
     binary = os.environ["PYDD_PYNIXD"]
     stores: dict[Path, list[Lane]] = {}
@@ -212,7 +215,7 @@ async def served(lanes: dict[str, Lane], log: Path) -> AsyncIterator[dict[str, L
             socket = Path(os.environ.get("XDG_RUNTIME_DIR") or "/tmp") / f"pydd-pynixd-{os.getpid()}-{index}.sock"
             socket.unlink(missing_ok=True)
             config = log / f"pynixd-{index}.json"
-            config.write_text(json.dumps(pynixd_config(members, socket), indent=2))
+            config.write_text(json.dumps(pynixd_config(members, socket, daemon=daemon), indent=2))
             output = stack.enter_context((log / f"pynixd-{index}.log").open("w"))
             process = await stack.enter_async_context(
                 await anyio.open_process(
@@ -392,7 +395,7 @@ async def test(arguments: argparse.Namespace) -> int:
     # "database is busy" in the first mode of a project.
     for lane in {lane.store: lane for lane in used.values()}.values():
         await lane.nix_run(["store", "info", "--store", str(lane.store)], 300, sys.stderr)
-    async with served(used, log) if arguments.pynixd else nullcontext(used) as serving:
+    async with served(used, log, daemon=arguments.daemon) if arguments.pynixd else nullcontext(used) as serving:
         test_set = TestSet(
             arguments.set,
             log,
@@ -416,7 +419,7 @@ async def run(arguments: argparse.Namespace, extra: list[str]) -> int:
     chosen = {arguments.lane: lanes(arguments.pynixd)[arguments.lane]}
     log = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "pydd" / "run"
     log.mkdir(parents=True, exist_ok=True)
-    async with served(chosen, log) if arguments.pynixd else nullcontext(chosen) as serving:
+    async with served(chosen, log, daemon=arguments.daemon) if arguments.pynixd else nullcontext(chosen) as serving:
         lane = serving[arguments.lane]
         paths = await lane.build(
             arguments.attribute,
@@ -445,6 +448,12 @@ def parser() -> argparse.ArgumentParser:
     common.add_argument(
         "--pynixd", action="store_true", help="serve each store through a pynixd that builds and writes it itself"
     )
+    common.add_argument(
+        "--no-daemon",
+        dest="daemon",
+        action="store_false",
+        help="with --pynixd: run no Nix daemon under pynixd, which then answers every operation itself",
+    )
     commands = top.add_subparsers(dest="command", required=True)
 
     one = commands.add_parser(
@@ -467,6 +476,8 @@ def parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     arguments, extra = parser().parse_known_args()
+    if not arguments.daemon and not arguments.pynixd:
+        parser().error("--no-daemon needs --pynixd")
     if arguments.command == "test":
         if extra:
             parser().error(f"unrecognized arguments: {' '.join(extra)}")
