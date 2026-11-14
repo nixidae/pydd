@@ -145,32 +145,36 @@ def script_env(top: Path, where: Path, tree: Path, nodejs: str, name: str, versi
         directory = directory.parent
     home = top / "home"
     home.mkdir(exist_ok=True)
-    return os.environ | {
-        "PATH": ":".join([*bins, str(node_gyp(top, nodejs)), os.environ["PATH"]]),
-        "HOME": str(home),
-        "INIT_CWD": str(where),
-        "npm_package_name": name,
-        "npm_package_version": version,
-        "npm_package_json": str(where / "package.json"),
-        "npm_node_execpath": f"{nodejs}/bin/node",
-        "npm_config_node_gyp": f"{nodejs}/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js",
-        # node-gyp reads Node's headers from here, and downloads none.
-        "npm_config_nodedir": nodejs,
-        # prebuild-install and node-pre-gyp download a binary unless told.
-        "npm_config_build_from_source": "true",
-        # node-gyp runs make with this many jobs. Nix's 0 means every core.
-        "npm_config_jobs": {"0": "max", "": "1"}.get(cores := os.environ.get("NIX_BUILD_CORES", ""), cores),
-        "npm_config_offline": "true",
-        "npm_config_update_notifier": "false",
-        "npm_config_cache": str(top / "npm-cache"),
-    } | {
-        # A package's own `overrides.<name>.env` wins over the defaults above:
-        # sharp reads build_from_source as "compile libvips", and needs it off
-        # to take the prebuilt binary its lock already holds.
-        key: value
-        for key, value in os.environ.items()
-        if key.startswith("npm_config_")
-    }
+    return (
+        os.environ
+        | {
+            "PATH": ":".join([*bins, str(node_gyp(top, nodejs)), os.environ["PATH"]]),
+            "HOME": str(home),
+            "INIT_CWD": str(where),
+            "npm_package_name": name,
+            "npm_package_version": version,
+            "npm_package_json": str(where / "package.json"),
+            "npm_node_execpath": f"{nodejs}/bin/node",
+            "npm_config_node_gyp": f"{nodejs}/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js",
+            # node-gyp reads Node's headers from here, and downloads none.
+            "npm_config_nodedir": nodejs,
+            # prebuild-install and node-pre-gyp download a binary unless told.
+            "npm_config_build_from_source": "true",
+            # node-gyp runs make with this many jobs. Nix's 0 means every core.
+            "npm_config_jobs": {"0": "max", "": "1"}.get(cores := os.environ.get("NIX_BUILD_CORES", ""), cores),
+            "npm_config_offline": "true",
+            "npm_config_update_notifier": "false",
+            "npm_config_cache": str(top / "npm-cache"),
+        }
+        | {
+            # A package's own `overrides.<name>.env` wins over the defaults above:
+            # sharp reads build_from_source as "compile libvips", and needs it off
+            # to take the prebuilt binary its lock already holds.
+            key: value
+            for key, value in os.environ.items()
+            if key.startswith("npm_config_")
+        }
+    )
 
 
 def run_lifecycle(top: Path, where: Path, tree: Path, nodejs: str, name: str, version: str) -> None:
