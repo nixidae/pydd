@@ -62,6 +62,9 @@ and, from a node override (`graph.nix` at `overridesOf`), any of `patches`,
 from __future__ import annotations
 
 import ast
+import base64
+import csv
+import hashlib
 import importlib
 import io
 import json
@@ -72,6 +75,7 @@ import sys
 import tempfile
 import tokenize
 import tomllib
+import zipfile
 from pathlib import Path
 from typing import Protocol, cast
 
@@ -227,27 +231,54 @@ def patch_finder(text: str, build_dir: str, root: str) -> tuple[str, bool]:
     return text, bool(spans)
 
 
-def redirect(out: Path, build_dir: str, root: str) -> int:
-    """Rewrite every recorded build path under `out`. Return how many changed."""
-    changed = 0
-    for path in sorted(out.rglob("*")):
-        if not path.is_file():
-            continue
-        if path.suffix == ".pth":
-            text = path.read_text(encoding="utf-8")
-            new_text, patched = patch_pth(text, build_dir, root)
-            if patched:
-                path.write_text(new_text, encoding="utf-8")
-                changed += 1
-                print(f"editable: redirected {path.name}", file=sys.stderr)
-        elif path.suffix == ".py" and build_dir in (text := path.read_text(encoding="utf-8", errors="ignore")):
+def record_row(name: str, data: bytes) -> list[str]:
+    """A RECORD row of the wheel spec: urlsafe base64 SHA-256 without padding, and the size."""
+    digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
+    return [name, f"sha256={digest}", str(len(data))]
+
+
+def redirect_wheel(wheel: Path, build_dir: str, root: str) -> int:
+    """Rewrite every build path the editable wheel records, and its RECORD. Return how many changed.
+
+    **Before the install, not after.** The installer compiles each `.py` and
+    hashes it into RECORD, so a file rewritten after it keeps the build
+    directory in its `.pyc` and its RECORD row. Outside a chroot that
+    directory is new for each build (`/nix/var/nix/builds/nix-<pid>-<n>`), and
+    the output then differs on every build of the same derivation.
+    """
+    with zipfile.ZipFile(wheel) as source:
+        entries = [(info, source.read(info)) for info in source.infolist()]
+    changed: dict[str, bytes] = {}
+    for info, data in entries:
+        name = info.filename
+        if name.endswith(".pth"):
+            new_text, patched = patch_pth(data.decode("utf-8"), build_dir, root)
+        elif name.endswith(".py") and build_dir in (text := data.decode("utf-8", errors="ignore")):
             new_text, patched = patch_finder(text, build_dir, root)
             if not patched:
-                raise RuntimeError(f"{path} names the build directory outside a string literal")
-            path.write_text(new_text, encoding="utf-8")
-            changed += 1
-            print(f"editable: redirected {path.name}", file=sys.stderr)
-    return changed
+                raise RuntimeError(f"{name} names the build directory outside a string literal")
+        else:
+            continue
+        if patched:
+            changed[name] = new_text.encode("utf-8")
+            print(f"editable: redirected {name}", file=sys.stderr)
+    if not changed:
+        return 0
+    records = [(i.filename, d) for i, d in entries if i.filename.endswith(".dist-info/RECORD")]
+    if len(records) != 1:
+        raise RuntimeError(f"{wheel.name} holds {len(records)} RECORD files, and a wheel holds one")
+    [(record_name, record)] = records
+    rows = io.StringIO()
+    writer = csv.writer(rows, lineterminator="\n")
+    for row in csv.reader(io.StringIO(record.decode("utf-8"))):
+        writer.writerow(record_row(row[0], changed[row[0]]) if row and row[0] in changed else row)
+    changed[record_name] = rows.getvalue().encode("utf-8")
+    rewritten = wheel.with_suffix(".redirected")
+    with zipfile.ZipFile(rewritten, "w", zipfile.ZIP_DEFLATED) as target:
+        for info, data in entries:
+            target.writestr(info, changed.get(info.filename, data))
+    rewritten.replace(wheel)
+    return len(changed) - 1
 
 
 def writable_copy(source: Path) -> Path:
@@ -313,7 +344,7 @@ def install(wheel: Path, out: Path, installer_path: str) -> None:
 
 
 def build_editable(project: Path, out: Path, backend_name: str, installer_path: str, root: str) -> None:
-    """Build the PEP 660 wheel, install it, and redirect what it recorded."""
+    """Build the PEP 660 wheel, redirect what it recorded, and install it."""
     dist = Path.cwd() / "dist"
     dist.mkdir()
 
@@ -323,12 +354,11 @@ def build_editable(project: Path, out: Path, backend_name: str, installer_path: 
     print(f"editable: {backend_name} wrote {wheel_name}", file=sys.stderr)
     os.chdir(dist.parent)
 
-    install(dist / wheel_name, out, installer_path)
-
     # **The redirect names the tree that ran, and not the tree that was
     # copied.** A project below a subdirectory records that subdirectory, so
     # the path to rewrite is the one the backend ran in.
-    changed = redirect(out, str(project), root)
+    changed = redirect_wheel(dist / wheel_name, str(project), root)
+    install(dist / wheel_name, out, installer_path)
     if changed == 0:
         # A project with no code, such as a metapackage of fastmcp, has
         # nothing to redirect. Code that the wheel copied is the error.
