@@ -79,6 +79,8 @@ class Menu:
     #: The workspace members to install, by path, as `pnpm --filter <member>...`
     #: takes them. `None`: every member.
     members: list[str] | None = None
+    #: The npm hashes of a Yarn 2+ lock, a file that `pydd-yarn-integrity` writes.
+    yarn_integrity: str | None = None
     #: The tool of the lock, such as bun, which only the root's scripts get.
     manager: str | None = None
     #: The environment of the root's scripts.
@@ -633,7 +635,7 @@ def main() -> int:
             if path and name_of(path, entry) in menu.install_scripts:
                 entry["hasInstallScript"] = True
     else:
-        packages = _readers.read(menu.directory, menu.lockfile, menu.install_scripts, menu.members)
+        packages = _readers.read(menu.directory, menu.lockfile, menu.install_scripts, menu.members, menu.yarn_integrity)
         lock = Lock(packages, planner.system, menu.libc, menu.omit)
     if menu.members is not None:
         lock.only(menu.members)

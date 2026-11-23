@@ -53,6 +53,7 @@ which a fixed-output fetch takes as it is.
 | bun | in the lock | in the lock | in the lock | those that `trustedDependencies` names |
 | pnpm 9 to 11 | a graph; the reader places it | only "has programs" | in the lock | those that `allowBuilds` or `onlyBuiltDependencies` names |
 | Yarn v1 | a graph; the reader places it | not recorded | not recorded | not recorded |
+| Yarn 2+ | a graph; the reader places it | in the lock | in the lock | in the integrity file |
 
 **The reader places a graph as npm does.** Each version goes to the top
 `node_modules`, unless another version of that name is visible from its
@@ -76,9 +77,29 @@ built-in list of packages that it trusts. pydd does not copy that list.
 platform, installs for the build. The result omits them as development
 dependencies, or keeps them all.
 
-**Yarn 2 and newer are refused.** Their `checksum` is the hash of Yarn's
-own zip of the package, not of the tarball. Nix cannot check a fetch
-against it. This is the problem of Go's `go.sum` (nixidae/nixidae#806).
+**Yarn 2 and newer need an integrity file.** Their `checksum` is the hash
+of Yarn's own zip of the package, not of the tarball, so Nix cannot check
+a fetch against it. `pydd-yarn-integrity` (`packages.yarn-integrity`)
+reads the lock and writes `yarn-integrity.json`: the npm `integrity` of
+each `name@npm:version`, from the registry's metadata, and whether it has
+an install script. Run it at each change of the lock; it fetches only the
+versions that the file lacks. `yarnIntegrity` names a file outside the
+project. A version with no line in the file fails the plan.
+
+The Yarn 2+ reader applies the project's `resolutions` as Yarn does: the
+first entry whose names and ranges match rewrites the range. It applies
+a project patch (`patch:...#~/.yarn/patches/...`) as pnpm's. It leaves out
+Yarn's own patches (`optional!builtin<compat/...>`): they add Plug'n'Play
+support, which a `node_modules` tree does not use. It runs the install
+script of each version that has one, as Yarn does, unless `enableScripts:
+false` or `dependenciesMeta.<name>.built: false` says otherwise.
+
+**Peers place as Yarn places them.** A Yarn 2+ lock names peers and does
+not resolve them. The reader gives a package one version for each set of
+peers that its dependents provide, and puts it where each peer resolves
+to the version that its dependent provides. Two such versions share one
+place where the peers of both resolve. On Rocket.Chat 9.0.0, placement
+without this gave 28 peers that differed from the dependent's; with it, 0.
 
 **`out` reads npm's lock only.** In `out` the host makes every node, in
 Nix. Nix reads no YAML, and the host would need each reader a second
@@ -268,5 +289,6 @@ the derivation.
 - A git dependency outside GitHub, GitLab and sourcehut, and one with a
   `prepare` script. The planner and the node refuse them by name.
 - `npm test` as `root.tests`.
-- Yarn 2 and newer, whose checksums Nix cannot check.
+- Yarn 2+ protocols other than `npm:`, `workspace:` and `patch:` of those:
+  `link:`, `portal:`, `file:`, git and URLs. The reader refuses them by name.
 - `out` for pnpm, bun and Yarn.

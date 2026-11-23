@@ -1,0 +1,16 @@
+{
+  "name": "esbuild-app",
+  "version": "0.1.0",
+  "description": "TypeScript that esbuild bundles at build time: a development dependency with a binary for each platform.",
+  "bin": "dist/main.js",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --outfile=dist/main.js --banner:js='#!/usr/bin/env node'"
+  },
+  "dependencies": {
+    "ms": "^2.1.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  },
+  "packageManager": "yarn@4.18.1"
+}

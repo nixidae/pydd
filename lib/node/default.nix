@@ -56,7 +56,7 @@ let
       # `nix store prefetch-file --unpack <url>` prints it, and the planner's
       # error names the URL.
       outputHashes ? { },
-      # The lock that the planner reads: npm's, pnpm's, bun's or Yarn v1's. By
+      # The lock that the planner reads: npm's, pnpm's, bun's or Yarn's. By
       # default the first of them that `project` holds.
       lockfile ? lib.findFirst (file: builtins.pathExists (project + "/${file}")) null [
         "package-lock.json"
@@ -64,6 +64,15 @@ let
         "bun.lock"
         "yarn.lock"
       ],
+      # The npm hashes of a Yarn 2+ lock, which `pydd-yarn-integrity` writes
+      # (`packages.yarn-integrity`). By default `yarn-integrity.json` beside
+      # the lock. A file outside `project` suits a project fetched from
+      # upstream.
+      yarnIntegrity ?
+        let
+          file = project + "/yarn-integrity.json";
+        in
+        if builtins.pathExists file then file else null,
       # More packages whose install scripts run, by name. pnpm and bun run
       # only the scripts that the project allows (`allowBuilds`,
       # `onlyBuiltDependencies`, `trustedDependencies`), and Yarn v1's lock
@@ -79,7 +88,12 @@ let
         {
           "pnpm-lock.yaml" = pkgs.pnpm;
           "bun.lock" = pkgs.bun;
-          "yarn.lock" = pkgs.yarn;
+          # Yarn 2+ names itself in `packageManager`, as corepack reads it.
+          "yarn.lock" =
+            if lib.hasPrefix "yarn@1." (manifest.packageManager or "yarn@1.") then
+              pkgs.yarn
+            else
+              pkgs.yarn-berry;
         }
         .${lockfile} or null,
       # The environment of the root's `scripts`, as
@@ -197,6 +211,7 @@ let
       }
       # Only when set, so the menu of every other project keeps its hash.
       // lib.optionalAttrs (members != null) { inherit members; }
+      // lib.optionalAttrs (yarnIntegrity != null) { yarn_integrity = "${yarnIntegrity}"; }
       // lib.optionalAttrs (packageManager != null) { manager = "${packageManager}"; }
       // lib.optionalAttrs (scriptEnv != { }) { script_env = scriptEnv; };
       # On released Nix the host makes each node, and the planner writes only

@@ -1,0 +1,16 @@
+{
+  "name": "hello-npm",
+  "version": "0.1.0",
+  "description": "An ES module program over chalk, with two versions of ansi-styles in one tree.",
+  "type": "module",
+  "bin": "bin/hello-npm.js",
+  "dependencies": {
+    "ansi-styles": "^6.2.1",
+    "chalk": "^4.1.2",
+    "semver": "^7.6.3"
+  },
+  "packageManager": "yarn@4.18.1",
+  "resolutions": {
+    "semver@npm:^7.6.3": "7.8.5"
+  }
+}

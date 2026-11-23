@@ -11,6 +11,9 @@ license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = []
 
+[project.scripts]
+pydd-yarn-integrity = "pydd.node.yarn_integrity:main"
+
 [project.optional-dependencies]
 huggorm = ["huggorm"]
 venv = ["packaging"]

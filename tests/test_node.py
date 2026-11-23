@@ -29,7 +29,11 @@ def lock(project: str, system: str = "x86_64-linux", omit: list[str] | None = No
     omit = ["dev"] if omit is None else omit
     name = lockfile(project)
     if name != "package-lock.json":
-        return Lock(_readers.read(str(PROJECTS / project), name), system, "glibc", omit)
+        integrity = PROJECTS / project / "yarn-integrity.json"
+        packages = _readers.read(
+            str(PROJECTS / project), name, integrity=str(integrity) if integrity.is_file() else None
+        )
+        return Lock(packages, system, "glibc", omit)
     data = json.loads((PROJECTS / project / name).read_text())
     return Lock.read(data, system, "glibc", omit)
 

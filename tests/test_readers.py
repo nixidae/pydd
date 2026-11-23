@@ -9,7 +9,18 @@ from typing import Any
 
 import pytest
 
-from pydd.node._readers import bun_path, parse_yarn, pnpm_key, read, read_pnpm, read_yarn
+from pydd.node._readers import (
+    Resolution,
+    berry_conditions,
+    berry_patch,
+    bun_path,
+    parse_berry,
+    parse_yarn,
+    pnpm_key,
+    read,
+    read_berry,
+    read_pnpm,
+)
 
 PROJECTS = Path(__file__).parent / "node"
 
@@ -19,7 +30,15 @@ PAIRS = [
     ("pnpm-workspace", "pnpm-lock.yaml", "workspace"),
     ("bun-native", "bun.lock", "native-npm"),
     ("yarn-esbuild", "yarn.lock", "esbuild-app"),
+    ("berry-esbuild", "yarn.lock", "esbuild-app"),
+    ("berry-workspace", "yarn.lock", "workspace"),
+    ("berry-hello", "yarn.lock", "hello-npm"),
 ]
+
+
+def integrity(project: Path) -> str | None:
+    file = project / "yarn-integrity.json"
+    return str(file) if file.is_file() else None
 
 
 def view(packages: dict[str, dict[str, Any]]) -> dict[str, tuple[Any, ...]]:
@@ -39,7 +58,8 @@ def view(packages: dict[str, dict[str, Any]]) -> dict[str, tuple[Any, ...]]:
 @pytest.mark.parametrize(("project", "lockfile", "npm"), PAIRS)
 def test_reader_places_packages_as_npm_does(project: str, lockfile: str, npm: str) -> None:
     expected = json.loads((PROJECTS / npm / "package-lock.json").read_text())["packages"]
-    assert view(read(str(PROJECTS / project), lockfile)) == view(expected)
+    packages = read(str(PROJECTS / project), lockfile, integrity=integrity(PROJECTS / project))
+    assert view(packages) == view(expected)
 
 
 def test_a_nested_version_stays_under_its_dependent() -> None:
@@ -104,10 +124,125 @@ def test_pnpm_alias() -> None:
     assert pnpm_key("react-dom", "18.2.0(react@18.2.0)") == "react-dom@18.2.0(react@18.2.0)"
 
 
-def test_yarn_berry_is_refused(tmp_path: Path) -> None:
+def test_yarn_berry_needs_its_integrity_file() -> None:
+    with pytest.raises(SystemExit, match="pydd-yarn-integrity"):
+        read(str(PROJECTS / "berry-hello"), "yarn.lock")
+
+
+def test_yarn_berry_without_a_hash_is_refused(tmp_path: Path) -> None:
+    shutil.copytree(PROJECTS / "berry-hello", tmp_path, dirs_exist_ok=True)
+    (tmp_path / "yarn-integrity.json").write_text("{}")
+    with pytest.raises(SystemExit, match="no hash for 8 packages"):
+        read(str(tmp_path), "yarn.lock", integrity=str(tmp_path / "yarn-integrity.json"))
+
+
+def test_an_unknown_yarn_berry_lock_version_is_refused(tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text("{}")
-    with pytest.raises(SystemExit, match="zip archives"):
-        read_yarn(str(tmp_path), "__metadata:\n  version: 8\n  cacheKey: 10c0\n")
+    with pytest.raises(SystemExit, match="has version 6"):
+        read_berry(str(tmp_path), "__metadata:\n  version: 6\n  cacheKey: 8\n", {})
+
+
+def test_yarn_berry_resolution_rewrites_the_range() -> None:
+    """berry-hello pins semver through `resolutions`; its lock has no `semver@npm:^7.6.3`."""
+    project = PROJECTS / "berry-hello"
+    assert "semver@npm:^7.6.3" not in parse_berry((project / "yarn.lock").read_text())
+    packages = read(str(project), "yarn.lock", integrity=integrity(project))
+    assert packages["node_modules/semver"]["version"] == "7.8.5"
+
+
+def test_yarn_berry_resolution_patterns() -> None:
+    scoped = Resolution.parse("css-loader@npm:6.11.0/postcss", "8.5.26")
+    assert scoped.rewrite(("css-loader", "npm:6.11.0"), "postcss", "npm:^8.4.0") == "npm:8.5.26"
+    assert scoped.rewrite(("css-loader", "npm:7.0.0"), "postcss", "npm:^8.4.0") is None
+    ranged = Resolution.parse("@scope/ws@npm:^8", "^8.20.1")
+    assert ranged.rewrite(("app", "workspace:."), "@scope/ws", "npm:^8") == "npm:^8.20.1"
+    assert ranged.rewrite(("app", "workspace:."), "@scope/ws", "npm:^8.1") is None
+    patch = "patch:zod@npm%3A4.3.6#~/.yarn/patches/zod.patch"
+    assert Resolution.parse("zod", patch).rewrite(("x", "npm:1.0.0"), "zod", "npm:^4") == patch
+
+
+def test_yarn_berry_lock_blocks() -> None:
+    blocks = parse_berry(
+        '__metadata:\n  version: 10\n\n"@a/b@npm:^1.0.0, @a/b@npm:^1.2.0":\n  version: 1.2.3\n'
+        '  resolution: "@a/b@npm:1.2.3"\n  dependencies:\n    "@c/d": "npm:^2"\n    e: "npm:1.0.0"\n'
+        "  dependenciesMeta:\n    e:\n      optional: true\n  conditions: (os=android | os=linux) & cpu=x64\n"
+    )
+    assert blocks["@a/b@npm:^1.0.0"] is blocks["@a/b@npm:^1.2.0"]
+    block = blocks["@a/b@npm:^1.0.0"]
+    assert block["dependencies"] == {"@c/d": "npm:^2", "e": "npm:1.0.0"}
+    assert block["dependenciesMeta"] == {"e": {"optional": "true"}}
+    assert berry_conditions(block["conditions"]) == {"os": ["android", "linux"], "cpu": ["x64"]}
+
+
+def test_yarn_berry_patches() -> None:
+    reference = "patch:zod@npm%3A4.3.6#~/.yarn/patches/zod-npm-4.3.6.patch::version=4.3.6&hash=18f503"
+    assert berry_patch("zod", reference) == ("zod@npm:4.3.6", ".yarn/patches/zod-npm-4.3.6.patch")
+    builtin = "patch:resolve@npm%3A1.22.8#optional!builtin<compat/resolve>::version=1.22.8&hash=9bd1a5"
+    assert berry_patch("resolve", builtin) == ("resolve@npm:1.22.8", None)
+
+
+#: A project on react 18 with `old`, which brings react 17, and `plugin`,
+#: which takes react as a peer. Both the project and `old` depend on `plugin`.
+PEER_LOCK = """__metadata:
+  version: 10
+
+"peers@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "peers@workspace:."
+
+"react@npm:^18":
+  version: 18.3.1
+  resolution: "react@npm:18.3.1"
+
+"react@npm:^17":
+  version: 17.0.2
+  resolution: "react@npm:17.0.2"
+
+"old@npm:^1":
+  version: 1.0.0
+  resolution: "old@npm:1.0.0"
+  dependencies:
+    plugin: "npm:^1"
+    react: "npm:^17"
+
+"plugin@npm:^1":
+  version: 1.0.0
+  resolution: "plugin@npm:1.0.0"
+  peerDependencies:
+    react: "*"
+"""
+
+PEER_HASHES = {
+    key: {"integrity": "sha512-AAAA"}
+    for key in ("react@npm:18.3.1", "react@npm:17.0.2", "old@npm:1.0.0", "plugin@npm:1.0.0")
+}
+
+
+def peer_project(tmp_path: Path, dependencies: dict[str, str], lock: str = PEER_LOCK) -> dict[str, dict[str, Any]]:
+    (tmp_path / "package.json").write_text(json.dumps({"name": "peers", "dependencies": dependencies}))
+    (tmp_path / "yarn.lock").write_text(lock)
+    (tmp_path / "yarn-integrity.json").write_text(json.dumps(PEER_HASHES))
+    return read(str(tmp_path), "yarn.lock", integrity=str(tmp_path / "yarn-integrity.json"))
+
+
+def test_a_package_goes_where_its_peers_resolve(tmp_path: Path) -> None:
+    packages = peer_project(tmp_path, {"react": "^18", "old": "^1", "plugin": "^1"})
+    assert packages["node_modules/react"]["version"] == "18.3.1"
+    assert packages["node_modules/old/node_modules/react"]["version"] == "17.0.2"
+    # The project's plugin sees react 18 from the top; old's must see react 17.
+    assert "node_modules/plugin" in packages
+    assert "node_modules/old/node_modules/plugin" in packages
+    assert packages["node_modules/plugin"]["peerDependencies"] == {"react": "*"}
+
+
+def test_one_copy_where_the_peers_agree(tmp_path: Path) -> None:
+    packages = peer_project(
+        tmp_path,
+        {"react": "^18", "old": "^1", "plugin": "^1"},
+        PEER_LOCK.replace('react: "npm:^17"', 'react: "npm:^18"'),
+    )
+    assert [path for path in packages if path.endswith("/plugin")] == ["node_modules/plugin"]
+    assert [path for path in packages if path.endswith("/react")] == ["node_modules/react"]
 
 
 def test_old_pnpm_lock_is_refused(tmp_path: Path) -> None:

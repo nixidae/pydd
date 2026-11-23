@@ -37,6 +37,24 @@ let
   pydd-drv = pkgs.callPackage ./tools/pydd-drv { inherit (nix.libs) nix-store; };
   pydd-drv-released = pkgs.callPackage ./tools/pydd-drv { inherit (nixReleased.libs) nix-store; };
 
+  # The npm hashes of a Yarn 2+ lock, for the npm lane: docs/node.md.
+  yarn-integrity = pkgs.python3Packages.buildPythonApplication {
+    pname = "pydd";
+    version = "0.1.0";
+    pyproject = true;
+    src = lib.fileset.toSource {
+      root = ./.;
+      fileset = lib.fileset.unions [
+        ./pyproject.toml
+        ./README.md
+        ./LICENSE
+        ./src
+      ];
+    };
+    build-system = [ pkgs.python3Packages.setuptools ];
+    meta.mainProgram = "pydd-yarn-integrity";
+  };
+
   # The evaluator in the planner is huggorm's, and so is the staging store of
   # a planner that writes `$out`.
   writersOf =
@@ -597,7 +615,7 @@ in
 # The schema of nixidae/nixidae#1103.
 {
   packages = {
-    inherit pydd-drv pydd-drv-released;
+    inherit pydd-drv pydd-drv-released yarn-integrity;
     default = pydd-drv;
   };
   inherit (internal) checks;

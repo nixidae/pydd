@@ -124,6 +124,35 @@ let
         test ! -e "$modules/@esbuild"
       '';
     };
+    # hello-npm from Yarn 4's lock, with npm's hashes from yarn-integrity.json.
+    # `resolutions` pins semver, so the lock holds no entry for the manifest's range.
+    berry-hello = {
+      src = ./berry-hello;
+      lock = "yarn";
+      check = ''
+        test "$(hello-npm)" = 'hello from hello-npm semver=7 styles=6/4'
+      '';
+    };
+    # esbuild from Yarn 4's lock, which gives each platform's package its
+    # conditions: only this platform's installs. esbuild's install script runs.
+    berry-esbuild = {
+      src = ./berry-esbuild;
+      lock = "yarn";
+      check = ''
+        test "$(esbuild-app)" = 'hello from esbuild-app day=86400000'
+        modules=$(dirname "$(readlink -f "$(command -v esbuild-app)")")/../node_modules
+        test ! -e "$modules/esbuild"
+      '';
+    };
+    # The npm workspace with Yarn 4: `@workspace/greet@npm:^0.1.0` resolves to the member.
+    berry-workspace = {
+      src = ./berry-workspace;
+      lock = "yarn";
+      arguments.program = "workspace-app";
+      check = ''
+        test "$(workspace-app)" = 'hello from workspace-app hour=3600000'
+      '';
+    };
   };
 in
 builtins.mapAttrs (
